@@ -152,7 +152,16 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel()) {
 
 @Composable
 private fun RestoreActions(viewModel: OnboardingViewModel, state: OnboardingState) {
-    PillButton("Restore your library", { }, Modifier.fillMaxWidth().testTag("onboarding_restore"), enabled = !state.restoring)
+    if (state.restoreError != null) {
+        Text(state.restoreError, style = LumenType.label, color = LumenColors.danger)
+        Spacer(Modifier.height(12.dp))
+    }
+    PillButton(
+        if (state.restoring) "Restoring…" else "Restore your library",
+        viewModel::restore,
+        Modifier.fillMaxWidth().testTag("onboarding_restore"),
+        enabled = !state.restoring,
+    )
     Spacer(Modifier.height(10.dp))
     PillButton("Start fresh", viewModel::next, Modifier.fillMaxWidth().testTag("onboarding_fresh"), style = PillStyle.OUTLINED)
 }

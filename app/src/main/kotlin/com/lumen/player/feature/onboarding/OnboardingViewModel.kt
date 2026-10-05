@@ -1,6 +1,9 @@
 package com.lumen.player.feature.onboarding
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import com.lumen.player.core.storage.SnapshotManager
+import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.lifecycle.viewModelScope
 import com.lumen.player.core.storage.LumenPaths
 import com.lumen.player.core.storage.StorageSetup
@@ -29,6 +32,7 @@ data class OnboardingState(
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val settings: SettingsRepository,
     private val paths: LumenPaths,
     private val setup: StorageSetup,
@@ -54,9 +58,24 @@ class OnboardingViewModel @Inject constructor(
         _state.update { it.copy(storageMode = mode) }
         viewModelScope.launch {
             settings.setStorageMode(mode)
-            val summary = withContext(Dispatchers.IO) { RestoreCheck.summary(paths) }
-            _state.update { it.copy(restoreSummary = summary) }
+            val summary = withContext(Dispatchers.IO) {
+                if (SnapshotManager.privateDatabaseIsEmpty(context)) SnapshotManager.summary(paths.snapshot) else null
+            }
+            _state.update { it.copy(restoreSummary = summary?.toString()) }
             next()
+        }
+    }
+
+    fun restore() {
+        _state.update { it.copy(restoring = true, restoreError = null) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { SnapshotManager.restoreInto(context, paths.snapshot) } }
+            if (result.isSuccess) {
+                _state.update { it.copy(restoring = false) }
+                next()
+            } else {
+                _state.update { it.copy(restoring = false, restoreError = "Couldn't restore the backup. You can start fresh instead.") }
+            }
         }
     }
 

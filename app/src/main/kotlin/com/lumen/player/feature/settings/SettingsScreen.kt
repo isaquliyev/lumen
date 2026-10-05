@@ -33,10 +33,14 @@ import com.lumen.player.core.design.Space
 import com.lumen.player.data.StorageMode
 import com.lumen.player.feature.shell.LocalBottomSpace
 import com.lumen.player.feature.shell.bottomPadding
+import java.text.DateFormat
+import java.util.Date
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val lastBackup by viewModel.lastBackup.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = bottomPadding(LocalBottomSpace.current)) {
         item {
             Column(Modifier.statusBarsPadding().padding(top = 8.dp)) {
@@ -51,6 +55,15 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         if (settings.storageMode == StorageMode.PRIVATE) {
             item { InfoRow("Private storage", "Your library will be deleted if you uninstall Lumen.", warning = true) }
         }
+        item {
+            InfoRow(
+                "Back up now",
+                lastBackup?.let { "Last backup: ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it))}" }
+                    ?: "Copies your library data to Lumen/data",
+                tag = "settings_backup",
+                onClick = { viewModel.backUpNow() },
+            )
+        }
         item { SettingsSection("Appearance") }
         item {
             SwitchRow("Reduce motion", "Turns off ambient and staggered animations.", settings.reduceMotion, "settings_reduce_motion") {
@@ -59,6 +72,13 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         }
         item { SettingsSection("About") }
         item { InfoRow("Lumen ${BuildConfig.VERSION_NAME}", "Personal use only. Fonts: Fraunces and Manrope (SIL Open Font License).") }
+        if (BuildConfig.DEBUG) {
+            item { SettingsSection("Debug") }
+            if (message != null) item { InfoRow(message!!, tag = "settings_message") }
+            item { InfoRow("Seed 1,500 fake songs", tag = "debug_seed_songs", onClick = { viewModel.seedSongs() }) }
+            item { InfoRow("Seed 1 year of fake plays", tag = "debug_seed_plays", onClick = { viewModel.seedPlays() }) }
+            item { InfoRow("Remove seeded data", tag = "debug_remove_seed", onClick = { viewModel.removeSeeded() }) }
+        }
     }
 }
 

@@ -47,3 +47,23 @@
 - Fonts live in `assets/fonts/`, not `res/font/`. On HyperOS, Compose silently ignored
   `FontVariation.Settings` for resource fonts and fell back to the system font. The fonts are now built
   with `Typeface.Builder(...).setFontVariationSettings(...)`, which works.
+
+## P2 · Data layer (2026-10-05)
+
+**Done**
+- Room: the 8 entities from §5.1, list projections without the waveform (`TrackRow` etc.), DAOs incl.
+  `observeSongs` with the Focus filter and the §9.4 stats SQL (with a Focus-scope variant).
+- The database is only opened by the first query. `MainViewModel` starts backups only after onboarding.
+- Repositories: Tracks (like, edit, soft delete with file removal), Playlists, Focus (DataStore),
+  Settings.
+- `SnapshotManager`: `VACUUM INTO` → `Lumen/data/lumen.db` with rotation to `lumen-prev.db`;
+  triggers: 30 s debounce on Room invalidation, app ON_STOP, "Back up now".
+- Onboarding Restore step (shows "N songs, M playlists"), copies the snapshot in before Room opens.
+- Debug seeders: 1,500 songs (`seed…` ids), 1 year of plays (`DEBUG_SEED`), remove seeded data.
+
+**Verified on the phone**
+- `connectedDebugAndroidTest`: 4/4 pass (focus filter incl. featured, playlist reorder + duplicates,
+  stats with fixed timestamps, soft delete keeps events and allows ID reuse).
+- Seed → `Lumen/data/lumen.db` (1.5 MB) written 30 s after the last write.
+- Uninstall → reinstall → onboarding offered "1,500 songs, 0 playlists" → restore worked, and Room
+  opened the restored file (a backup from it succeeded).

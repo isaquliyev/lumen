@@ -82,6 +82,14 @@ interface StatsDao {
     @Query("SELECT MIN(pe.started_at) FROM play_events pe JOIN track_artists ta ON ta.track_id = pe.track_id WHERE ta.artist_id = :artistId")
     fun firstListenOfArtist(artistId: String): Flow<Long?>
 
+    // songs played most at these hours of the day, across all history
+    @Query(
+        "SELECT pe.track_id AS trackId, SUM(pe.listened_ms >= 30000) AS plays, SUM(pe.listened_ms) AS listenedMs FROM play_events pe " +
+            "WHERE CAST(strftime('%H', pe.started_at / 1000, 'unixepoch', 'localtime') AS INTEGER) IN (:hours) AND $EVENT_FOCUS " +
+            "GROUP BY pe.track_id HAVING plays > 0 ORDER BY plays DESC, listenedMs DESC LIMIT :limit"
+    )
+    fun aroundHours(hours: List<Int>, limit: Int, focusOff: Boolean, focusIds: List<String>): Flow<List<TrackPlays>>
+
     // songs with at least 3 plays and none since the cutoff
     @Query(
         "SELECT track_id AS trackId, SUM(listened_ms >= 30000) AS plays, SUM(listened_ms) AS listenedMs FROM play_events " +

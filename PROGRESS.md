@@ -238,3 +238,19 @@
 
 **Not tested on the device**
 - The recap notification itself (it only fires in the first week of a month).
+
+## P10 · Home (2026-10-05)
+
+**Done**
+- Header (date overline, Fraunces greeting by time of day, Focus / Search / Settings icons, Focus pill).
+- Sections, each hidden when empty: Pick up where you left off (resume card), Pulse strip
+  ("Today 56 min · 17-day streak · Top: …" → Pulse), recap card on days 1–7 (→ last month's recap),
+  On repeat, For this hour (new `aroundHours` SQL, ±1 h over all history), Your playlists, Artists you
+  love, Recently added, Rediscover. Empty library → "Your library is quiet." + Add.
+- Every section is scoped by Artist Focus.
+
+**Verified on the phone**
+- With the seeded + real library: all 9 sections render (screenshots `shots/p10-home-*.png`).
+- Focus on Kanye West: strip shows "Top: Kanye West", For this hour shows only Kanye songs, On repeat
+  and Rediscover disappear (no Kanye plays there), accent switches; clearing Focus restores everything.
+- The empty-library state is the same component as in P1 (not re-tested, so the user's library is untouched).

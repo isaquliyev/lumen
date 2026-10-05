@@ -5,18 +5,28 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lumen.player.core.design.LumenColors
+import com.lumen.player.core.design.LumenTheme
+import com.lumen.player.feature.onboarding.OnboardingScreen
+import com.lumen.player.feature.shell.AppShell
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: MainViewModel by viewModels()
+
+    @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -24,11 +34,21 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         setContent {
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color(0xFF0B0B0C)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("Lumen", color = Color(0xFFF3EFE8), fontSize = 48.sp)
+            val settings by viewModel.settings.collectAsStateWithLifecycle()
+            LumenTheme(reduceMotion = settings?.reduceMotion ?: false) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(LumenColors.ink)
+                        .semantics { testTagsAsResourceId = true },
+                ) {
+                    val current = settings
+                    when {
+                        current == null -> Unit
+                        !current.onboardingDone -> OnboardingScreen()
+                        else -> AppShell()
+                    }
+                }
             }
         }
     }

@@ -25,3 +25,25 @@
   it's redundant.
 - The release build uses debug signing until the release keystore is made in P12.
 - Use `MSYS_NO_PATHCONV=1` in Git Bash for adb commands with `/sdcard/...` paths.
+
+## P1 · Design system, shell, onboarding, storage (2026-10-05)
+
+**Done**
+- Design tokens (`core/design`): colours, cover-tone accent (with the 4.5:1 contrast step), type scale,
+  motion/space/radii, `LumenTheme`, first shared components (PillButton, SectionHeader, SegmentedTabs,
+  EmptyState, ScreenTitle).
+- App shell: type-safe routes, NavHost, bottom nav (Home · Library · Pulse · Add) with the ember dot.
+- `LumenPaths` + `StorageSetup` (folders, `.nomedia`, `README.txt`, low-space check) + atomic `moveInto`.
+- `SettingsRepository` (DataStore) with every setting key the app needs.
+- Onboarding: Welcome → Storage (all-files access, re-checked on resume, private fallback) → Restore
+  slot → Notifications → Background (battery + MIUI Autostart) → Done.
+- Settings skeleton: folder path, private-storage warning, Reduce motion, About.
+
+**Verified on the phone**
+- Full onboarding flow; `/sdcard/Lumen/` has all 7 folders + `.nomedia` + `README.txt`.
+- Screenshots `shots/p1-*.png`: Fraunces + Manrope render, ink/paper colours, ember dot on the active tab.
+
+**Deviation**
+- Fonts live in `assets/fonts/`, not `res/font/`. On HyperOS, Compose silently ignored
+  `FontVariation.Settings` for resource fonts and fell back to the system font. The fonts are now built
+  with `Typeface.Builder(...).setFontVariationSettings(...)`, which works.

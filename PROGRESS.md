@@ -121,3 +121,25 @@
 
 **Open**
 - Lock-screen controls and headset-unplug pause need a manual check by the user (asked at the end).
+
+## P5 · Library (2026-10-05)
+
+**Done**
+- Library: Songs (count · total time, Shuffle/Play, 5 sorts, A–Z rail for Title/Artist sorts, tap plays the
+  list from that song, ⋯ track menu, long-press multi-select with Add to playlist / Play next / Like /
+  Delete), Artists (3-column grid, sort by name or listening time, focused artists first, long-press
+  focus actions), Albums (2-column grid).
+- Artist page (photo header fading into ink, Play/Shuffle/Focus, stats line, top songs, all songs,
+  albums, appears on), Album page (glow behind the cover, meta line, songs in track order).
+- Local search (title/artists/album, accent-insensitive, grouped results, last 10 recent searches).
+- Track menu sheet: play next, add to queue, add to playlist, like, go to artist/album, focus on
+  artist, edit info, lyrics re-fetch / offset, "Wrong audio? Choose another" (yt-dlp candidates →
+  ReplaceAudio job), delete with confirm (soft delete, also removes it from the queue).
+- Artist Focus foundation (focus pill, focus sheet, shell-level FocusViewModel) used by the Library.
+
+**Verified on the phone**
+- Release build with 1,507 songs: `gfxinfo` 1,399 frames, **0.07 % janky**, p99 9 ms.
+- All 5 sorts, A–Z rail (tap N → jumps to N), artists by listening time, albums grid, artist page,
+  search ("daft" → song, artist, album), track menu, delete (audio + cover + thumb removed, row
+  soft-deleted), multi-select delete of two seeded songs (soft-deleted).
+- A download works in the **release** build (R8 rules for youtubedl-android are enough).

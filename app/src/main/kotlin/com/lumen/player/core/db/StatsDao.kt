@@ -82,6 +82,13 @@ interface StatsDao {
     @Query("SELECT MIN(pe.started_at) FROM play_events pe JOIN track_artists ta ON ta.track_id = pe.track_id WHERE ta.artist_id = :artistId")
     fun firstListenOfArtist(artistId: String): Flow<Long?>
 
+    // songs with at least 3 plays and none since the cutoff
+    @Query(
+        "SELECT track_id AS trackId, SUM(listened_ms >= 30000) AS plays, SUM(listened_ms) AS listenedMs FROM play_events " +
+            "GROUP BY track_id HAVING plays >= :minPlays AND MAX(started_at) < :cutoff ORDER BY plays DESC"
+    )
+    fun forgotten(minPlays: Int, cutoff: Long): Flow<List<TrackPlays>>
+
     @Query("SELECT MIN(started_at) FROM play_events")
     fun firstEventTime(): Flow<Long?>
 }

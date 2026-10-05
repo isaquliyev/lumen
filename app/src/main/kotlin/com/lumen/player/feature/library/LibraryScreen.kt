@@ -336,7 +336,7 @@ private fun AlbumsTab(viewModel: LibraryViewModel) {
 
 @Composable
 fun AlbumTile(album: AlbumRow, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(Radii.card)).clickable(onClick = onClick).testTag("album_${album.id}")) {
+    Column(modifier.clickable(onClick = onClick).testTag("album_${album.id}")) {
         CoverImage(album.coverTrackId?.let { trackThumb(it, true) }, album.title, Modifier.fillMaxWidth().aspectRatio(1f), radius = Radii.card, letterSize = LumenType.display.fontSize)
         Spacer(Modifier.height(8.dp))
         Text(album.title, style = LumenType.body, color = LumenColors.paper, maxLines = 1, overflow = TextOverflow.Ellipsis)

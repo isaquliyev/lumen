@@ -60,6 +60,15 @@ import com.lumen.player.core.design.LumenColors
 import com.lumen.player.core.design.Durations
 import com.lumen.player.core.design.lumenTween
 import com.lumen.player.feature.player.MiniPlayer
+import com.lumen.player.feature.album.AlbumScreen
+import com.lumen.player.feature.artist.ArtistScreen
+import com.lumen.player.feature.focus.FocusSheet
+import com.lumen.player.feature.focus.FocusViewModel
+import com.lumen.player.feature.focus.LocalFocusActions
+import com.lumen.player.feature.library.TrackMenuHost
+import com.lumen.player.feature.search.SearchScreen
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import com.lumen.player.feature.player.NowPlaying
 import com.lumen.player.feature.player.PlayerViewModel
 import androidx.activity.compose.BackHandler
@@ -99,7 +108,11 @@ fun NavHostController.openTab(route: Any) {
 val LocalPlayer = staticCompositionLocalOf<PlayerViewModel> { error("PlayerViewModel not provided") }
 
 @Composable
-fun AppShell(viewModel: ShellViewModel = hiltViewModel(), player: PlayerViewModel = hiltViewModel()) {
+fun AppShell(
+    viewModel: ShellViewModel = hiltViewModel(),
+    player: PlayerViewModel = hiltViewModel(),
+    focus: FocusViewModel = hiltViewModel(),
+) {
     val navController = rememberNavController()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val nowPlaying by player.nowPlaying.collectAsStateWithLifecycle()
@@ -138,12 +151,36 @@ fun AppShell(viewModel: ShellViewModel = hiltViewModel(), player: PlayerViewMode
     }
     BackHandler(enabled = expanded) { expanded = false }
 
-    CompositionLocalProvider(LocalBottomSpace provides bottomSpace, LocalPlayer provides player) {
+    val navigator = remember(navController) {
+        object : Navigator {
+            override fun open(route: Any) {
+                expanded = false
+                when (route) {
+                    HomeRoute, LibraryRoute, PulseRoute, AddRoute -> navController.openTab(route)
+                    else -> navController.navigate(route) { launchSingleTop = true }
+                }
+            }
+
+            override fun back() {
+                navController.popBackStack()
+            }
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalBottomSpace provides bottomSpace,
+        LocalPlayer provides player,
+        LocalNav provides navigator,
+        LocalFocusActions provides focus,
+    ) {
+      TrackMenuHost {
         Box(Modifier.fillMaxSize().background(LumenColors.ink)) {
             NavHost(
                 navController = navController,
                 startDestination = HomeRoute,
                 modifier = Modifier.fillMaxSize(),
+                enterTransition = { fadeIn(lumenTween(Durations.MEDIUM)) },
+                exitTransition = { fadeOut(lumenTween(Durations.SHORT)) },
             ) {
                 composable<HomeRoute> {
                     HomeScreen(
@@ -156,7 +193,9 @@ fun AppShell(viewModel: ShellViewModel = hiltViewModel(), player: PlayerViewMode
                 composable<PulseRoute> { PulseScreen() }
                 composable<AddRoute> { AddScreen(onPlayTrack = { id -> player.playIds(listOf(id)) }) }
                 composable<SettingsRoute> { SettingsScreen(onBack = { navController.popBackStack() }) }
-                composable<SearchRoute> { }
+                composable<SearchRoute> { SearchScreen() }
+                composable<ArtistRoute> { ArtistScreen() }
+                composable<AlbumRoute> { AlbumScreen() }
             }
             Column(Modifier.align(Alignment.BottomCenter)) {
                 nowPlaying?.let { track ->
@@ -184,7 +223,9 @@ fun AppShell(viewModel: ShellViewModel = hiltViewModel(), player: PlayerViewMode
             ) {
                 nowPlaying?.let { NowPlaying(it, player, onCollapse = { expanded = false }) }
             }
+            FocusSheet()
         }
+      }
     }
 }
 

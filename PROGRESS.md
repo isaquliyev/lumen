@@ -185,3 +185,26 @@
 - Focus on Kanye West while New Grass played → snackbar → Play → 10 skips, all Kanye West.
 - Kanye West + Daft Punk → 15 songs; Evening Mix shows "Showing 2 of 5"; focus survives force-stop;
   clearing restores the full library.
+
+## P8 · Now Playing complete (2026-10-05)
+
+**Done**
+- Player sheet over the app: drag down (or back) to collapse, spring animation.
+- Now Playing: OLED black + cover-tone glow that breathes while playing, PLAYING FROM + context, ⋯ track
+  menu, cover pager (swipe = previous/next), title (shrinks for long titles), each artist tappable
+  (Open / Focus), like with a pop, 96-bar waveform scrubber (tap or drag, haptic tick every 10 %),
+  time codes, controls (repeat-one icon), lyrics peek (crossfading current line), bottom row
+  Lyrics · Queue · Sleep (shows time left) · Add.
+- Full lyrics screen (§13.1): active line at ~35 %, neighbours 45 %, others 20 % + blur (API 31+),
+  spring scale, auto-scroll paused 3 s after manual scrolling, tap to seek, ♪ ♪ ♪ for breaks,
+  per-track offset, plain and "no lyrics" states.
+- Queue sheet: Now playing / Next in queue (Clear) / Next from: context, drag reorder, swipe remove.
+- Sleep timer (15–90 min, end of song; debug builds also have 1 min): fades over the last 10 s,
+  pauses, restores the volume. Mini player progress line uses the song's accent.
+
+**Verified on the phone**
+- Waveform tap at 50 % of Get Lucky → 184.0 s (expected 183.5 s; within ±1 s).
+- Tapping lyric line 55 → exactly 184,050 ms, the line's LRC time.
+- Shuffle on + "Play next" Bohemian Rhapsody then Smells Like Teen Spirit → queue shows them in that order.
+- 1-minute sleep timer started 17:44:48, paused at 17:45:47.
+- Screenshots `shots/p8-*.png` (player, lyrics, queue).

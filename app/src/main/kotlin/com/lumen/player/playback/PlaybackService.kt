@@ -37,6 +37,7 @@ class PlaybackService : MediaSessionService() {
     @Inject lateinit var queue: QueueManager
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var extras: PlaybackExtras
+    @Inject lateinit var tracker: ListeningTracker
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaSession? = null
@@ -85,6 +86,8 @@ class PlaybackService : MediaSessionService() {
 
         scope.launch { settings.settings.collect { normalize = it.normalize; applyGain(player) } }
         extras.attach(player, scope)
+        extras.onRestoreVolume = { applyGain(player) }
+        tracker.attach(player)
 
         // restore the last queue, paused
         scope.launch {
@@ -127,6 +130,7 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         session?.let { s ->
             runCatching { runBlocking { queue.save(s.player) } }
+            tracker.release()
             extras.detach()
             holder.player.value = null
             s.player.release()

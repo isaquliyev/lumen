@@ -75,7 +75,7 @@ import com.lumen.player.feature.playlist.PlaylistScreen
 import com.lumen.player.feature.playlist.SmartPlaylistScreen
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import com.lumen.player.feature.player.NowPlaying
+import com.lumen.player.feature.player.PlayerSheet
 import com.lumen.player.feature.player.PlayerViewModel
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -230,13 +230,7 @@ fun AppShell(
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
             }
-            AnimatedVisibility(
-                visible = expanded && nowPlaying != null,
-                enter = slideInVertically(lumenTween(Durations.LONG)) { it },
-                exit = slideOutVertically(lumenTween(Durations.MEDIUM)) { it },
-            ) {
-                nowPlaying?.let { NowPlaying(it, player, onCollapse = { expanded = false }) }
-            }
+            PlayerSheet(expanded, player, onCollapse = { expanded = false })
             FocusSheet()
         }
         }

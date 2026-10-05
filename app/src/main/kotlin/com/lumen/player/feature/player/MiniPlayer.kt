@@ -49,7 +49,7 @@ fun MiniPlayer(track: TrackRow, viewModel: PlayerViewModel, onExpand: () -> Unit
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val duration by viewModel.durationMs.collectAsStateWithLifecycle()
     val position by remember { viewModel.position(500) }.collectAsStateWithLifecycle(0L)
-    val accent = LocalAccent.current.accent
+    val accent = viewModel.accent.collectAsStateWithLifecycle().value?.accent ?: LocalAccent.current.accent
     val haptics = LocalHapticFeedback.current
     val progress = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
 

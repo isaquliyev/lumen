@@ -69,6 +69,7 @@ import com.lumen.player.feature.focus.FocusViewModel
 import com.lumen.player.feature.focus.LocalFocusActions
 import com.lumen.player.feature.library.TrackMenuHost
 import com.lumen.player.feature.search.SearchScreen
+import com.lumen.player.feature.recap.RecapScreen
 import com.lumen.player.feature.playlist.AddSongsScreen
 import com.lumen.player.feature.playlist.AddToPlaylistHost
 import com.lumen.player.feature.playlist.PlaylistScreen
@@ -156,6 +157,13 @@ fun AppShell(
             viewModel.events.consumePlayer()
         }
     }
+    LaunchedEffect(Unit) {
+        viewModel.events.routes.collect { route ->
+            expanded = false
+            navController.navigate(route) { launchSingleTop = true }
+            viewModel.events.consumeRoute()
+        }
+    }
     BackHandler(enabled = expanded) { expanded = false }
 
     val navigator = remember(navController) {
@@ -209,9 +217,12 @@ fun AppShell(
                 composable<PlaylistRoute> { PlaylistScreen() }
                 composable<SmartPlaylistRoute> { SmartPlaylistScreen() }
                 composable<AddSongsRoute> { AddSongsScreen() }
+                composable<RecapRoute> { RecapScreen() }
             }
             if (focused != null) FocusVignette(focused.accent, Modifier.fillMaxSize())
-            Column(Modifier.align(Alignment.BottomCenter)) {
+            val currentEntry by navController.currentBackStackEntryAsState()
+            val fullScreen = currentEntry?.destination?.hasRoute(RecapRoute::class) == true
+            if (!fullScreen) Column(Modifier.align(Alignment.BottomCenter)) {
                 nowPlaying?.let { track ->
                     MiniPlayer(track, player, onExpand = { expanded = true }, modifier = Modifier.padding(bottom = 8.dp))
                 }

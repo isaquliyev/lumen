@@ -24,11 +24,14 @@ class MainViewModel @Inject constructor(
     private val snapshots: dagger.Lazy<SnapshotManager>,
     private val queue: dagger.Lazy<DownloadQueue>,
     private val links: dagger.Lazy<LinkHandler>,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val events: AppEvents,
     private val player: dagger.Lazy<PlayerConnection>,
 ) : ViewModel() {
 
     fun openPlayer() = events.openPlayer()
+
+    fun openRecap(year: Int, month: Int) = events.openRoute(com.lumen.player.feature.shell.RecapRoute(year, month))
     val settings: StateFlow<Settings?> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
@@ -37,6 +40,7 @@ class MainViewModel @Inject constructor(
             repository.settings.first { it.onboardingDone }
             snapshots.get().start()
             player.get().connect()
+            com.lumen.player.feature.recap.RecapWorker.schedule(context)
             queue.get().resumeAfterStart()
         }
     }

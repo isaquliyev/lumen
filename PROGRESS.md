@@ -208,3 +208,33 @@
 - Shuffle on + "Play next" Bohemian Rhapsody then Smells Like Teen Spirit → queue shows them in that order.
 - 1-minute sleep timer started 17:44:48, paused at 17:45:47.
 - Screenshots `shots/p8-*.png` (player, lyrics, queue).
+
+## P9 · Listening tracker, Pulse, Recap (2026-10-05)
+
+**Done**
+- `ListeningTracker` as in §9.2 (real playing time only, 30 s checkpoints, 15-min sessions, open rows
+  saved on pause), attached in `PlaybackService`. `first_listen` is only set on a real play (≥ 30 s).
+- `StatsCalculator` (periods with local days and locale week start, streaks, sessions, skip /
+  completion rates, on-repeat moment, new-to-you share, % change, 9 archetypes + Balanced Listener)
+  with 7 JVM unit tests (26 unit tests in total, all pass).
+- `PulseRepository`: one build per period from the §9.4 SQL; re-runs on every Room change, so Pulse is
+  live. The current period is compared with the same stretch of the previous one.
+- Pulse screen: range tabs + ‹ › history, Everything | Focus (+ Focus card), hero count-up with ▲/▼,
+  top songs (5 / see all 50), artists, albums, genres, radial clock, week rhythm, calendar heatmap
+  (month grid / year grid), trend, streaks, discovery, habits, on-repeat moment, personality,
+  library + growth, "How it's counted" sheet, "Not enough listening yet" progress state.
+- Canvas charts (`RadialClock`, `BarRow`, `HBarList`, `CalendarHeatmap`, `Sparkline`), animated in
+  unless Reduce motion is on.
+- Recap stories (month or year): 6 s slides, tap left/right, hold to pause, progress segments; summary
+  card → PNG in `Lumen/exports/` → share sheet via FileProvider. `RecapWorker` (daily) notifies once in
+  the first week of a month if last month had ≥ 60 min; the notification opens that recap.
+
+**Verified on the phone**
+- Good Morning skipped at ~10 s → 12.7 s SKIPPED; I Wonder seeked near the end → 24.6 s COMPLETED;
+  Stronger 40 s + pause 10 s + 20 s → 76.4 s STOPPED; the paused current song stays open (NULL).
+- Pulse Today minutes went 54 → 55 → 56 while playing (no screen change needed).
+- Year view with a seeded year: every card renders, no empty or NaN values.
+- October recap → summary → share: `Lumen/exports/recap-2026-10.png` written, MIUI share sheet opened.
+
+**Not tested on the device**
+- The recap notification itself (it only fires in the first week of a month).

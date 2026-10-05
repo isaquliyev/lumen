@@ -102,7 +102,8 @@ class ListeningTracker @Inject constructor(
         val snapshot = context.current
         val focusActive = focus.isActive
         scope.launch(writer) {
-            val first = !events.hasQualifyingPlay(o.trackId, excludeId = o.id)
+            // only a real play (30 s or more) can be the first listen of a song
+            val first = listened >= 30_000 && !events.hasQualifyingPlay(o.trackId, excludeId = o.id)
             events.upsert(
                 PlayEventEntity(
                     o.id, o.trackId, o.startedAt, System.currentTimeMillis(), listened, o.durationMs,

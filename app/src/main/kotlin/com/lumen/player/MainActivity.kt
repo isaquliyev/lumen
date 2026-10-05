@@ -71,6 +71,9 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true) viewModel.openPlayer()
+        if (intent?.hasExtra(com.lumen.player.feature.recap.EXTRA_RECAP_YEAR) == true) {
+            viewModel.openRecap(intent.getIntExtra(com.lumen.player.feature.recap.EXTRA_RECAP_YEAR, 0), intent.getIntExtra(com.lumen.player.feature.recap.EXTRA_RECAP_MONTH, 0))
+        }
         if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             intent.getStringExtra(Intent.EXTRA_TEXT)?.let(viewModel::handleShared)
         }

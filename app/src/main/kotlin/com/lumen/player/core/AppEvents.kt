@@ -37,4 +37,13 @@ class AppEvents @Inject constructor() {
     }
 
     fun consumePlayer() = _expandPlayer.resetReplayCache()
+
+    private val _routes = MutableSharedFlow<Any>(replay = 1, extraBufferCapacity = 1)
+    val routes: SharedFlow<Any> = _routes
+
+    fun openRoute(route: Any) {
+        _routes.tryEmit(route)
+    }
+
+    fun consumeRoute() = _routes.resetReplayCache()
 }

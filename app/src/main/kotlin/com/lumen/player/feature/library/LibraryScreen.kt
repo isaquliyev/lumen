@@ -167,8 +167,10 @@ private fun SongsTab(viewModel: LibraryViewModel) {
                             Spacer(Modifier.width(8.dp))
                             PillButton("Play", { player.play(songs, 0, PlayContext.ALL_SONGS, null, "All songs") },
                                 style = PillStyle.OUTLINED, icon = Icons.Rounded.PlayArrow, modifier = Modifier.testTag("songs_play"))
-                            Spacer(Modifier.weight(1f))
-                            SortChip(SongSort.entries, sort, { it.label }, { viewModel.songSort.value = it; scope.launch { listState.scrollToItem(0) } })
+                            Spacer(Modifier.width(8.dp))
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                                SortChip(SongSort.entries, sort, { it.label }, { viewModel.songSort.value = it; scope.launch { listState.scrollToItem(0) } })
+                            }
                         }
                     }
                 } else {

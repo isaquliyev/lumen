@@ -272,3 +272,28 @@
 - Update now → "ALREADY_UP_TO_DATE 2026.08.19" (works; nothing newer today).
 - Restore from `lumen-prev.db` → app restarted (new pid), database identical (1,525 songs, 1 playlist,
   3,137 plays). A safety copy of the live DB was taken first (in the scratchpad, not in the repo).
+
+## P12 · Polish and release (2026-10-05)
+
+**Done**
+- Release keystore (`keytool`, RSA 4096) in `keystore/` + `keystore.properties`, both gitignored; the
+  release build type uses it (falls back to the debug key if the file is missing).
+- R8: found and fixed a real release-only crash. On a **fresh** install yt-dlp's first init unzips
+  Python with Apache Commons Compress, which R8 broke ("class … is not a concrete class"). Added keep
+  rules for commons-compress and commons-io. (The P5 release check passed only because it was an
+  upgrade over a debug install that had already unpacked Python.)
+- Accessibility: font scale 1.3 checked on Home, Library, Now Playing and Add; the sort chip now stays
+  on one line and shrinks with an ellipsis. Icon buttons have content descriptions and 48 dp targets.
+- Add tab: album results now use a compact download icon + track count instead of a big pill.
+- Removed the redundant `android:extractNativeLibs` manifest attribute (`useLegacyPackaging` sets it
+  in the merged manifest; the AGP warning is gone).
+- Seed data removed (library: 27 real songs).
+- Baseline Profile: skipped. Scrolling is already at 0.07 % janky frames in release.
+
+**Verified on the phone (release APK, release key)**
+- Uninstall → install release → onboarding offered "27 songs, 1 playlist" → restore → 27 songs,
+  Evening Mix (5 songs) and today's plays all back.
+- Download on a fresh release install works (One More Time), no JavaScript-runtime warning; the test
+  song was deleted again afterwards.
+- "Wrong audio? Choose another" on New Grass → candidates sheet → picked one → same song id, new
+  `youtube_id`, waveform recomputed.

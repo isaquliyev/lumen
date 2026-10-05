@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -120,8 +121,16 @@ fun AddScreen(onPlayTrack: (String) -> Unit = {}, viewModel: AddViewModel = hilt
                 ResultRow(
                     cover = album.coverMedium,
                     title = album.title,
-                    subtitle = album.artist?.name.orEmpty(),
-                    trailing = { PillButton("Download album${album.trackCount?.let { " ($it)" } ?: ""}", { viewModel.addAlbum(album) }, style = PillStyle.OUTLINED) },
+                    subtitle = listOfNotNull("Album", album.artist?.name, album.trackCount?.let { "$it songs" }).joinToString(" · "),
+                    trailing = {
+                        Row(
+                            Modifier.clip(CircleShape).clickable { viewModel.addAlbum(album) }.padding(horizontal = 10.dp, vertical = 8.dp).testTag("album_download_${album.id}"),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Rounded.Download, "Download album", tint = LumenColors.paper, modifier = Modifier.size(20.dp))
+                            album.trackCount?.let { Text(" $it", style = LumenType.numeric, color = LumenColors.paper2) }
+                        }
+                    },
                 )
             }
         }

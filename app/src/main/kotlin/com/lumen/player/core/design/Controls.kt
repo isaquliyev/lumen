@@ -48,7 +48,7 @@ fun <T> SortChip(options: List<T>, selected: T, label: (T) -> String, onSelect: 
                 .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label(selected), style = LumenType.label, color = LumenColors.paper)
+            Text(label(selected), style = LumenType.label, color = LumenColors.paper, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             Icon(Icons.Rounded.KeyboardArrowDown, null, tint = LumenColors.paper2, modifier = Modifier.size(18.dp))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = LumenColors.ink2) {

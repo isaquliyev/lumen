@@ -254,3 +254,21 @@
 - Focus on Kanye West: strip shows "Top: Kanye West", For this hour shows only Kanye songs, On repeat
   and Rediscover disappear (no Kanye plays there), accent switches; clearing Focus restores everything.
 - The empty-library state is the same component as in P1 (not re-tested, so the user's library is untouched).
+
+## P11 · Settings, backup, maintenance (2026-10-05)
+
+**Done**
+- Storage: folder path, space used per folder + free space, private-storage warning, "Hide songs from
+  other apps" (`.nomedia` + MediaScanner rescan), Back up now, Restore from backup (latest or previous;
+  copies over the live DB and restarts the app), Check library (missing audio + orphan files → Fix).
+- Playback: volume normalisation, resume on launch. Downloads: Wi-Fi only, parallel 1–3, prefer m4a,
+  yt-dlp version + Update now. Listening data: How it's counted, Reset statistics (two confirmations).
+- Appearance: Reduce motion. About: version, licences, personal use. Debug: seeders, remove seeded data,
+  Export logs (own-process logcat → `Lumen/exports/lumen-log-*.txt`).
+
+**Verified on the phone**
+- Moved Dopesmoker's audio out via adb + added an orphan file → Check library: "1 missing · 1 orphan".
+  With the file moved back, Fix deleted only the orphan.
+- Update now → "ALREADY_UP_TO_DATE 2026.08.19" (works; nothing newer today).
+- Restore from `lumen-prev.db` → app restarted (new pid), database identical (1,525 songs, 1 playlist,
+  3,137 plays). A safety copy of the live DB was taken first (in the scratchpad, not in the repo).

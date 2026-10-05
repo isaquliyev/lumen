@@ -45,6 +45,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.LaunchedEffect
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.lumen.player.core.TabRequest
+import com.lumen.player.core.design.LocalAccent
+import kotlinx.coroutines.launch
 import com.lumen.player.core.design.LumenColors
 import com.lumen.player.core.design.LumenType
 import com.lumen.player.feature.add.AddScreen
@@ -72,10 +83,34 @@ fun NavHostController.openTab(route: Any) {
 }
 
 @Composable
-fun AppShell() {
+fun AppShell(viewModel: ShellViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomSpace: Dp = navInset + 65.dp
+    val snackbars = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.messages.collect { message ->
+            launch {
+                snackbars.currentSnackbarData?.dismiss()
+                val result = snackbars.showSnackbar(message.text, message.action, duration = SnackbarDuration.Short)
+                if (result == SnackbarResult.ActionPerformed) message.onAction?.invoke()
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.events.tabs.collect { tab ->
+            navController.openTab(
+                when (tab) {
+                    TabRequest.HOME -> HomeRoute
+                    TabRequest.LIBRARY -> LibraryRoute
+                    TabRequest.PULSE -> PulseRoute
+                    TabRequest.ADD -> AddRoute
+                }
+            )
+            viewModel.events.consumeTab()
+        }
+    }
 
     CompositionLocalProvider(LocalBottomSpace provides bottomSpace) {
         Box(Modifier.fillMaxSize().background(LumenColors.ink)) {
@@ -98,6 +133,19 @@ fun AppShell() {
                 composable<SearchRoute> { }
             }
             BottomNav(navController, Modifier.align(Alignment.BottomCenter))
+            SnackbarHost(
+                snackbars,
+                Modifier.align(Alignment.BottomCenter).padding(bottom = bottomSpace + 8.dp),
+            ) { data ->
+                Snackbar(
+                    data,
+                    containerColor = LumenColors.ink3,
+                    contentColor = LumenColors.paper,
+                    actionColor = LocalAccent.current.accent,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
         }
     }
 }

@@ -20,7 +20,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    packaging { jniLibs { useLegacyPackaging = true } }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            keepDebugSymbols += "**/libpython.zip.so"
+        }
+    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -34,6 +39,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    testOptions { unitTests.isReturnDefaultValues = true }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -62,6 +69,13 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.lifecycle.process)
+    implementation(libs.okhttp)
+    implementation(libs.youtubedl.android)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 

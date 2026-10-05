@@ -2,9 +2,13 @@ package com.lumen.player
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lumen.player.core.AppEvents
+import com.lumen.player.core.TabRequest
 import com.lumen.player.core.storage.SnapshotManager
 import com.lumen.player.data.Settings
 import com.lumen.player.data.SettingsRepository
+import com.lumen.player.download.DownloadQueue
+import com.lumen.player.download.LinkHandler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,16 +19,29 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    settings: SettingsRepository,
+    private val repository: SettingsRepository,
     private val snapshots: dagger.Lazy<SnapshotManager>,
+    private val queue: dagger.Lazy<DownloadQueue>,
+    private val links: dagger.Lazy<LinkHandler>,
+    private val events: AppEvents,
 ) : ViewModel() {
-    val settings: StateFlow<Settings?> = settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val settings: StateFlow<Settings?> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         // nothing may touch the database before onboarding is finished (restore needs it closed)
         viewModelScope.launch {
-            settings.settings.first { it.onboardingDone }
+            repository.settings.first { it.onboardingDone }
             snapshots.get().start()
+            queue.get().resumeAfterStart()
+        }
+    }
+
+    fun handleShared(text: String) {
+        viewModelScope.launch {
+            repository.settings.first { it.onboardingDone }
+            val message = links.get().handle(text)
+            if (message.startsWith("Added")) events.open(TabRequest.ADD)
+            events.show(message)
         }
     }
 }

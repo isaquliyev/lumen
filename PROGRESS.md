@@ -67,3 +67,34 @@
 - Seed → `Lumen/data/lumen.db` (1.5 MB) written 30 s after the last write.
 - Uninstall → reinstall → onboarding offered "1,500 songs, 0 playlists" → restore worked, and Room
   opened the restored file (a backup from it succeeded).
+
+## P3 · Downloads (2026-10-05)
+
+**Done**
+- `core/net/Http` (OkHttp, Lumen User-Agent, per-host rate limiter, offline detection), JSON via
+  kotlinx.serialization.
+- Sources: Deezer (quota back-off 1/2/4 s, `Accept-Language: en`), iTunes genre rule, LRCLIB pick order,
+  Spotify (oEmbed + og:description, short links), yt-dlp (flat search, info, download, cancel).
+- `YtDlpManager`: init in `LumenApp`, `ready` flow, daily update worker, version.
+- `DownloadPipeline` with every §7.2 stage, duplicate check, ID reuse after delete, optional stages
+  that never fail the job, NEEDS_CHOICE, ReplaceAudio, one-transaction save, atomic moves.
+- `DownloadQueue` + `DownloadWorker` (foreground `dataSync`, 2 parallel, Wi-Fi-only constraint,
+  RUNNING → QUEUED after a killed process).
+- Add screen: Deezer search (350 ms debounce), albums with "Download album (N)", Paste link,
+  "Preparing downloader…", downloads list, Choose-audio sheet, Clear finished.
+- Share target (`ACTION_SEND text/plain`) → Add tab + snackbar; app-wide `AppEvents` for snackbars.
+- 19 JVM unit tests (LRC, Spotify, scoring, splitting, seeded tone, API parsing) all pass.
+
+**Verified on the phone**
+- Downloaded New Grass, Get Lucky, Bohemian Rhapsody (Add tab) and Smells Like Teen Spirit (shared
+  Spotify link with `/intl-de/` + `?si=`). Each has audio > 1 MB, cover + 256 px thumb, waveform (96)
+  and gain, genre (iTunes); synced lyrics where LRCLIB has them; Get Lucky has Pharrell Williams and
+  Nile Rodgers as separate FEATURED artists with photos.
+- Sharing New Grass again → "Already in your library".
+- Cancel during the audio stage (Sleep – Dopesmoker) → "Cancelled", empty work dir, no new audio file.
+- yt-dlp stderr shows no "No supported JavaScript runtime" warning (QuickJS works). Only the expected
+  "no ffmpeg / DASH m4a" warnings appear; those files analyse and play fine.
+
+**Deviation**
+- Spotify now serves an empty web-player shell to a desktop-browser User-Agent, so the track page is
+  fetched with Lumen's own User-Agent (crawler agent as a fallback).

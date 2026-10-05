@@ -328,6 +328,18 @@ interface DownloadJobDao {
     @Query("UPDATE download_jobs SET stage = :stage, progress = :progress, updated_at = :now WHERE id = :id AND status = 'RUNNING'")
     suspend fun setProgress(id: String, stage: String, progress: Int, now: Long)
 
+    @Query(
+        "UPDATE download_jobs SET status = :status, stage = :stage, progress = :progress, error = :error, track_id = :trackId, " +
+            "candidates = :candidates, updated_at = :now WHERE id = :id"
+    )
+    suspend fun finish(id: String, status: JobStatus, stage: String, progress: Int, error: String?, trackId: String?, candidates: String?, now: Long)
+
+    @Query("UPDATE download_jobs SET title = :title, artist = :artist, cover_url = COALESCE(:coverUrl, cover_url) WHERE id = :id")
+    suspend fun setInfo(id: String, title: String, artist: String, coverUrl: String?)
+
+    @Query("SELECT deezer_id FROM tracks WHERE deleted_at IS NULL AND deezer_id IS NOT NULL")
+    fun observeLibraryDeezerIds(): Flow<List<Long>>
+
     @Query("UPDATE download_jobs SET status = 'RUNNING', updated_at = :now WHERE id = :id AND status = 'QUEUED'")
     suspend fun claim(id: String, now: Long): Int
 

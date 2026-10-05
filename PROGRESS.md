@@ -297,3 +297,30 @@
   song was deleted again afterwards.
 - "Wrong audio? Choose another" on New Grass → candidates sheet → picked one → same song id, new
   `youtube_id`, waveform recomputed.
+- Screen-off playback (release): Echoes played for 10.5 minutes in the same process (position 632 s);
+  a follow-up check confirmed the screen really goes to sleep (`mWakefulness=Asleep`) while it keeps
+  playing. HyperOS wakes the screen again by itself while USB is connected.
+- No `AndroidRuntime` crash for `com.lumen.player` in logcat during the P12 session.
+
+## Final checklist (§16) status
+
+| Item | Status |
+|---|---|
+| Fresh install → onboarding → `Lumen/` folder | ✅ P1, again in P12 |
+| Deezer search → download → song with cover, lyrics, waveform | ✅ P3 (debug), P12 (release) |
+| Share a Spotify track link → downloads | ✅ P3 |
+| Wrong audio can be replaced | ✅ P12 |
+| All Songs: sort, fast-scroll, shuffle, multi-select, delete | ✅ P5 |
+| Playlists: create, add from 3 places, reorder, cover, pin, delete; Liked; smart playlists | ✅ P6 |
+| Artist Focus with 1 and 2 artists, filtered playback, visible, persists | ✅ P7 |
+| Pulse: all cards, live updates, Focus scope, recap + shared image | ✅ P9 |
+| Background playback 10+ min with the screen off | ✅ P12 |
+| Notification controls | ✅ P4 |
+| Lock-screen controls, headset unplug, Bluetooth buttons | ⏳ needs a manual check by the user |
+| Resume after force-stop | ✅ P4 |
+| Synced lyrics in time, peek, plain and "no lyrics" states | ✅ P8 (synced); plain/none states built, not hit on device |
+| Sleep timer | ✅ P8 |
+| Volume normalisation audible between loud and quiet songs | ⏳ built (gain from analysis); needs listening by the user |
+| Uninstall → reinstall → restore | ✅ P2 (debug), P12 (release, new key) |
+| Release build smooth with 1,500 seeded songs, then seed removed | ✅ P5 (0.07 % janky), seed removed in P12 |
+| No crash in logcat | ✅ none seen in the final session |

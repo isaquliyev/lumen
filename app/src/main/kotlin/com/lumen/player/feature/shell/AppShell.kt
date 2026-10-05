@@ -67,6 +67,10 @@ import com.lumen.player.feature.focus.FocusViewModel
 import com.lumen.player.feature.focus.LocalFocusActions
 import com.lumen.player.feature.library.TrackMenuHost
 import com.lumen.player.feature.search.SearchScreen
+import com.lumen.player.feature.playlist.AddSongsScreen
+import com.lumen.player.feature.playlist.AddToPlaylistHost
+import com.lumen.player.feature.playlist.PlaylistScreen
+import com.lumen.player.feature.playlist.SmartPlaylistScreen
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import com.lumen.player.feature.player.NowPlaying
@@ -124,7 +128,7 @@ fun AppShell(
         viewModel.events.messages.collect { message ->
             launch {
                 snackbars.currentSnackbarData?.dismiss()
-                val result = snackbars.showSnackbar(message.text, message.action, duration = SnackbarDuration.Short)
+                val result = snackbars.showSnackbar(message.text, message.action, duration = if (message.action != null) SnackbarDuration.Long else SnackbarDuration.Short)
                 if (result == SnackbarResult.ActionPerformed) message.onAction?.invoke()
             }
         }
@@ -173,6 +177,7 @@ fun AppShell(
         LocalNav provides navigator,
         LocalFocusActions provides focus,
     ) {
+      AddToPlaylistHost {
       TrackMenuHost {
         Box(Modifier.fillMaxSize().background(LumenColors.ink)) {
             NavHost(
@@ -196,6 +201,9 @@ fun AppShell(
                 composable<SearchRoute> { SearchScreen() }
                 composable<ArtistRoute> { ArtistScreen() }
                 composable<AlbumRoute> { AlbumScreen() }
+                composable<PlaylistRoute> { PlaylistScreen() }
+                composable<SmartPlaylistRoute> { SmartPlaylistScreen() }
+                composable<AddSongsRoute> { AddSongsScreen() }
             }
             Column(Modifier.align(Alignment.BottomCenter)) {
                 nowPlaying?.let { track ->
@@ -224,6 +232,7 @@ fun AppShell(
                 nowPlaying?.let { NowPlaying(it, player, onCollapse = { expanded = false }) }
             }
             FocusSheet()
+        }
         }
       }
     }

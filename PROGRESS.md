@@ -143,3 +143,27 @@
   search ("daft" → song, artist, album), track menu, delete (audio + cover + thumb removed, row
   soft-deleted), multi-select delete of two seeded songs (soft-deleted).
 - A download works in the **release** build (R8 rules for youtubedl-android are enough).
+
+## P6 · Playlists (2026-10-05)
+
+**Done**
+- Playlists tab: Create playlist, Liked Songs, On Repeat / Recently Added / Forgotten Gems (queries,
+  hidden when empty), user playlists pinned first then by last update; mosaic or custom covers.
+- Create sheet (default `My playlist #N`), detail page (glow from the first cover, 200 dp cover, meta,
+  Play/Shuffle/Add songs, ⋯ menu: edit name & description, change/remove cover, pin, delete),
+  sort chip, Focus banner "Showing X of Y · Focus: … · Show all".
+- Edit mode: drag handles (`reorderable`, positions rewritten in one transaction on drop), swipe left
+  to remove with an Undo snackbar (snackbars with an action now use the long duration).
+- Add Songs picker (search + checkboxes over the whole library, "Only {focus}" chip),
+  Add-to-playlist sheet (checkmarks, "Already in …", New playlist), Photo Picker custom cover →
+  1000 px square JPEG in `Lumen/playlists/`.
+
+**Verified on the phone**
+- Create, rename ("Evening Mix"), add from the picker, the track menu and multi-select, duplicate →
+  "Already in My playlist #1", drag reorder, swipe remove + Undo, custom cover, pin, delete.
+- Play starts in custom order; after force-stop the playlist is intact, and the snapshot holds it
+  (pinned, custom cover, same song order).
+
+**Note**
+- During testing, a stray tap on "Download album" downloaded Kanye West – *Graduation* (13 songs) and
+  Talk Talk – *Life's What You Make It*. They can be deleted from the Library.

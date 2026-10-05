@@ -98,3 +98,26 @@
 **Deviation**
 - Spotify now serves an empty web-player shell to a desktop-browser User-Agent, so the track page is
   fetched with Lumen's own User-Agent (crawler agent as a fallback).
+
+## P4 · Playback core (2026-10-05)
+
+**Done**
+- `PlaybackService` (MediaSessionService + ExoPlayer: audio focus, becoming-noisy pause, wake lock,
+  session activity → Now Playing, `onTaskRemoved`, `onPlaybackResumption`), queue restored paused on start.
+- `QueueManager`: our own shuffle (ExoPlayer stays in order), user-queued block ("#q" media ids, FIFO),
+  shuffle off rebuilds the original order, repeat cycle, persistence to DataStore every 5 s while
+  playing, on pause, and on skips/edits while paused.
+- `PlayerConnection` (MediaController → StateFlows, position polled only while collected),
+  `PlaybackContextHolder`, volume normalisation from `gain_db`.
+- Floating mini player (swipe left/right to skip, swipe up/tap to expand, accent progress line) and a
+  basic Now Playing overlay. Notification = Media3 default (artwork from `file://` cover).
+
+**Verified on the phone**
+- Playing from a temporary song list; `dumpsys media_session` shows the session.
+- HOME + Settings app for 3 minutes → still playing (position 191 s); media notification present.
+- `KEYCODE_MEDIA_PLAY_PAUSE` / `NEXT` work; notification pause/next buttons work (HyperOS media card
+  shows cover, title, artist).
+- force-stop → relaunch → queue restored paused at the saved position, plays on tap.
+
+**Open**
+- Lock-screen controls and headset-unplug pause need a manual check by the user (asked at the end).

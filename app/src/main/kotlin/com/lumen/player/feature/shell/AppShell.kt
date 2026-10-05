@@ -57,6 +57,19 @@ import com.lumen.player.core.TabRequest
 import com.lumen.player.core.design.LocalAccent
 import kotlinx.coroutines.launch
 import com.lumen.player.core.design.LumenColors
+import com.lumen.player.core.design.Durations
+import com.lumen.player.core.design.lumenTween
+import com.lumen.player.feature.player.MiniPlayer
+import com.lumen.player.feature.player.NowPlaying
+import com.lumen.player.feature.player.PlayerViewModel
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumen.player.core.design.LumenType
 import com.lumen.player.feature.add.AddScreen
 import com.lumen.player.feature.home.HomeScreen
@@ -82,11 +95,16 @@ fun NavHostController.openTab(route: Any) {
     }
 }
 
+// the app's player for every screen (play, play next, like)
+val LocalPlayer = staticCompositionLocalOf<PlayerViewModel> { error("PlayerViewModel not provided") }
+
 @Composable
-fun AppShell(viewModel: ShellViewModel = hiltViewModel()) {
+fun AppShell(viewModel: ShellViewModel = hiltViewModel(), player: PlayerViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val bottomSpace: Dp = navInset + 65.dp
+    val nowPlaying by player.nowPlaying.collectAsStateWithLifecycle()
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val bottomSpace: Dp = navInset + 65.dp + if (nowPlaying != null) 72.dp else 0.dp
     val snackbars = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -100,6 +118,7 @@ fun AppShell(viewModel: ShellViewModel = hiltViewModel()) {
     }
     LaunchedEffect(Unit) {
         viewModel.events.tabs.collect { tab ->
+            expanded = false
             navController.openTab(
                 when (tab) {
                     TabRequest.HOME -> HomeRoute
@@ -111,8 +130,15 @@ fun AppShell(viewModel: ShellViewModel = hiltViewModel()) {
             viewModel.events.consumeTab()
         }
     }
+    LaunchedEffect(Unit) {
+        viewModel.events.expandPlayer.collect {
+            expanded = true
+            viewModel.events.consumePlayer()
+        }
+    }
+    BackHandler(enabled = expanded) { expanded = false }
 
-    CompositionLocalProvider(LocalBottomSpace provides bottomSpace) {
+    CompositionLocalProvider(LocalBottomSpace provides bottomSpace, LocalPlayer provides player) {
         Box(Modifier.fillMaxSize().background(LumenColors.ink)) {
             NavHost(
                 navController = navController,
@@ -128,11 +154,16 @@ fun AppShell(viewModel: ShellViewModel = hiltViewModel()) {
                 }
                 composable<LibraryRoute> { LibraryScreen() }
                 composable<PulseRoute> { PulseScreen() }
-                composable<AddRoute> { AddScreen() }
+                composable<AddRoute> { AddScreen(onPlayTrack = { id -> player.playIds(listOf(id)) }) }
                 composable<SettingsRoute> { SettingsScreen(onBack = { navController.popBackStack() }) }
                 composable<SearchRoute> { }
             }
-            BottomNav(navController, Modifier.align(Alignment.BottomCenter))
+            Column(Modifier.align(Alignment.BottomCenter)) {
+                nowPlaying?.let { track ->
+                    MiniPlayer(track, player, onExpand = { expanded = true }, modifier = Modifier.padding(bottom = 8.dp))
+                }
+                BottomNav(navController)
+            }
             SnackbarHost(
                 snackbars,
                 Modifier.align(Alignment.BottomCenter).padding(bottom = bottomSpace + 8.dp),
@@ -146,9 +177,17 @@ fun AppShell(viewModel: ShellViewModel = hiltViewModel()) {
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
             }
+            AnimatedVisibility(
+                visible = expanded && nowPlaying != null,
+                enter = slideInVertically(lumenTween(Durations.LONG)) { it },
+                exit = slideOutVertically(lumenTween(Durations.MEDIUM)) { it },
+            ) {
+                nowPlaying?.let { NowPlaying(it, player, onCollapse = { expanded = false }) }
+            }
         }
     }
 }
+
 
 @Composable
 private fun BottomNav(navController: NavHostController, modifier: Modifier = Modifier) {

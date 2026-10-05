@@ -76,6 +76,9 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
     implementation(libs.coil.compose)
     implementation(libs.coil.network)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.session)
+    implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 

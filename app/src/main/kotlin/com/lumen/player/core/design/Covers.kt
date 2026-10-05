@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
 import com.lumen.player.core.storage.LumenPaths
 import com.lumen.player.core.util.hsl
 import com.lumen.player.core.util.seededTone
@@ -53,14 +53,11 @@ fun CoverImage(model: Any?, seed: String, modifier: Modifier = Modifier, radius:
         Placeholder(seed, shape, modifier, letterSize)
         return
     }
-    SubcomposeAsyncImage(
-        model = model,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = modifier.clip(shape),
-        loading = { Placeholder(seed, shape, Modifier.fillMaxSize(), letterSize) },
-        error = { Placeholder(seed, shape, Modifier.fillMaxSize(), letterSize) },
-    )
+    // the placeholder sits under the image, so lists don't need subcomposition
+    Box(modifier.clip(shape)) {
+        Placeholder(seed, shape, Modifier.fillMaxSize(), letterSize)
+        AsyncImage(model = model, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+    }
 }
 
 @Composable
@@ -69,14 +66,10 @@ fun ArtistAvatar(model: Any?, name: String, modifier: Modifier = Modifier, lette
         Placeholder(name, CircleShape, modifier, letterSize)
         return
     }
-    SubcomposeAsyncImage(
-        model = model,
-        contentDescription = name,
-        contentScale = ContentScale.Crop,
-        modifier = modifier.clip(CircleShape),
-        loading = { Placeholder(name, CircleShape, Modifier.fillMaxSize(), letterSize) },
-        error = { Placeholder(name, CircleShape, Modifier.fillMaxSize(), letterSize) },
-    )
+    Box(modifier.clip(CircleShape)) {
+        Placeholder(name, CircleShape, Modifier.fillMaxSize(), letterSize)
+        AsyncImage(model = model, contentDescription = name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+    }
 }
 
 @Composable

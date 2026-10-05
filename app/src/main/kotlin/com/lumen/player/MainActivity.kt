@@ -23,6 +23,7 @@ import com.lumen.player.core.design.LumenTheme
 import com.lumen.player.core.storage.LumenPaths
 import com.lumen.player.feature.onboarding.OnboardingScreen
 import com.lumen.player.feature.shell.AppShell
+import com.lumen.player.playback.EXTRA_OPEN_PLAYER
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true) viewModel.openPlayer()
         if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             intent.getStringExtra(Intent.EXTRA_TEXT)?.let(viewModel::handleShared)
         }

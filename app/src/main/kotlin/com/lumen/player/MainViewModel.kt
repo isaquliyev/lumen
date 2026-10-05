@@ -9,6 +9,7 @@ import com.lumen.player.data.Settings
 import com.lumen.player.data.SettingsRepository
 import com.lumen.player.download.DownloadQueue
 import com.lumen.player.download.LinkHandler
+import com.lumen.player.playback.PlayerConnection
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,10 @@ class MainViewModel @Inject constructor(
     private val queue: dagger.Lazy<DownloadQueue>,
     private val links: dagger.Lazy<LinkHandler>,
     private val events: AppEvents,
+    private val player: dagger.Lazy<PlayerConnection>,
 ) : ViewModel() {
+
+    fun openPlayer() = events.openPlayer()
     val settings: StateFlow<Settings?> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
@@ -32,6 +36,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             repository.settings.first { it.onboardingDone }
             snapshots.get().start()
+            player.get().connect()
             queue.get().resumeAfterStart()
         }
     }

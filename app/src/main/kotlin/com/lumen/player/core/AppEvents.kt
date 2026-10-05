@@ -28,4 +28,13 @@ class AppEvents @Inject constructor() {
     }
 
     fun consumeTab() = _tabs.resetReplayCache()
+
+    private val _expandPlayer = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 1)
+    val expandPlayer: SharedFlow<Unit> = _expandPlayer
+
+    fun openPlayer() {
+        _expandPlayer.tryEmit(Unit)
+    }
+
+    fun consumePlayer() = _expandPlayer.resetReplayCache()
 }

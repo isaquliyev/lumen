@@ -63,6 +63,8 @@ import com.lumen.player.feature.player.MiniPlayer
 import com.lumen.player.feature.album.AlbumScreen
 import com.lumen.player.feature.artist.ArtistScreen
 import com.lumen.player.feature.focus.FocusSheet
+import com.lumen.player.feature.focus.FocusVignette
+import com.lumen.player.feature.focus.focusAccent
 import com.lumen.player.feature.focus.FocusViewModel
 import com.lumen.player.feature.focus.LocalFocusActions
 import com.lumen.player.feature.library.TrackMenuHost
@@ -126,6 +128,7 @@ fun AppShell(
 
     LaunchedEffect(Unit) {
         viewModel.events.messages.collect { message ->
+            android.util.Log.d("Lumen", "snackbar: ${message.text}")
             launch {
                 snackbars.currentSnackbarData?.dismiss()
                 val result = snackbars.showSnackbar(message.text, message.action, duration = if (message.action != null) SnackbarDuration.Long else SnackbarDuration.Short)
@@ -179,6 +182,8 @@ fun AppShell(
     ) {
       AddToPlaylistHost {
       TrackMenuHost {
+        val focused = focusAccent()
+        CompositionLocalProvider(LocalAccent provides (focused ?: LocalAccent.current)) {
         Box(Modifier.fillMaxSize().background(LumenColors.ink)) {
             NavHost(
                 navController = navController,
@@ -205,6 +210,7 @@ fun AppShell(
                 composable<SmartPlaylistRoute> { SmartPlaylistScreen() }
                 composable<AddSongsRoute> { AddSongsScreen() }
             }
+            if (focused != null) FocusVignette(focused.accent, Modifier.fillMaxSize())
             Column(Modifier.align(Alignment.BottomCenter)) {
                 nowPlaying?.let { track ->
                     MiniPlayer(track, player, onExpand = { expanded = true }, modifier = Modifier.padding(bottom = 8.dp))
@@ -232,6 +238,7 @@ fun AppShell(
                 nowPlaying?.let { NowPlaying(it, player, onCollapse = { expanded = false }) }
             }
             FocusSheet()
+        }
         }
         }
       }

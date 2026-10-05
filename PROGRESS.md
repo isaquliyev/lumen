@@ -167,3 +167,21 @@
 **Note**
 - During testing, a stray tap on "Download album" downloaded Kanye West – *Graduation* (13 songs) and
   Talk Talk – *Life's What You Make It*. They can be deleted from the Library.
+
+## P7 · Artist Focus (2026-10-05)
+
+**Done**
+- Focus set in DataStore; songs match on main **or featured** credits. Songs, Albums, search, smart
+  playlists and the Add Songs picker are filtered; playlists show "Showing X of Y · Focus: … · Show all".
+- Entry points: artist page Focus pill, long-press in Library ▸ Artists, track menu "Focus on artist",
+  Home's target icon and the Focus pill → Focus sheet (search, multi-select chips with photos, Clear).
+- Visible state: Focus pill under Home/Library/Pulse titles, app accent switches to the first focused
+  artist's photo tone, 6 % accent vignette around the screen edges.
+- "Play only X now?" snackbar when Focus turns on while a non-matching song plays; its action shuffles
+  the focused songs. (A second "Focus: X" confirmation was removed; it hid that snackbar.)
+
+**Verified on the phone**
+- Focus on Chris Martin (only a featured artist) → 1 song (Homecoming), only the Graduation album.
+- Focus on Kanye West while New Grass played → snackbar → Play → 10 skips, all Kanye West.
+- Kanye West + Daft Punk → 15 songs; Evening Mix shows "Showing 2 of 5"; focus survives force-stop;
+  clearing restores the full library.

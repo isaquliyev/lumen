@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.material.icons.rounded.Search
+import com.lumen.player.feature.focus.FocusPill
+import com.lumen.player.feature.focus.LocalFocusActions
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +49,10 @@ fun HomeHeader(onOpenSearch: () -> Unit, onOpenSettings: () -> Unit) {
             )
             Text(greeting(), style = LumenType.display, color = LumenColors.paper)
         }
+        val focusActions = LocalFocusActions.current
+        IconButton(onClick = { focusActions.sheetOpen.value = true }, modifier = Modifier.testTag("home_focus")) {
+            Icon(Icons.Rounded.CenterFocusStrong, "Artist Focus", tint = LumenColors.paper)
+        }
         IconButton(onClick = onOpenSearch, modifier = Modifier.testTag("home_search")) {
             Icon(Icons.Rounded.Search, contentDescription = "Search", tint = LumenColors.paper)
         }
@@ -59,6 +66,7 @@ fun HomeHeader(onOpenSearch: () -> Unit, onOpenSettings: () -> Unit) {
 fun HomeScreen(onOpenSettings: () -> Unit, onOpenSearch: () -> Unit, onOpenAdd: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         HomeHeader(onOpenSearch, onOpenSettings)
+        FocusPill(Modifier.padding(start = Space.side, top = 8.dp))
         EmptyState(
             serifLine = "Your library is quiet.",
             body = "Songs you add live on this phone, in your Lumen folder.",

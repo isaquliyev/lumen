@@ -141,7 +141,6 @@ class TrackMenuViewModel @Inject constructor(
     fun focusOn(row: TrackRow) = viewModelScope.launch {
         val id = row.primaryArtistId ?: return@launch
         focus.only(id)
-        events.show("Focus: ${row.artistLine?.substringBefore(',')}")
     }
 }
 

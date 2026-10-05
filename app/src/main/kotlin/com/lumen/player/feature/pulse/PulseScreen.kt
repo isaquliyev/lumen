@@ -14,6 +14,7 @@ import com.lumen.player.core.design.ScreenTitle
 fun PulseScreen() {
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 16.dp)) {
         ScreenTitle("Pulse")
+        com.lumen.player.feature.focus.FocusPill(Modifier.padding(start = 20.dp, top = 4.dp))
         EmptyState("Not enough listening yet.", "Play some music and your stats will appear here, live.")
     }
 }

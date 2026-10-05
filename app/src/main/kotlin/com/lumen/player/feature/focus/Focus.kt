@@ -41,6 +41,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -107,6 +108,7 @@ class FocusViewModel @Inject constructor(
                 if (focus.off) return@collect
                 val playing = connection.nowPlaying.value ?: return@collect
                 val matches = tracks.songs.first().any { it.id == playing.id }
+                android.util.Log.d("Lumen", "focus changed: playing=${playing.title} matches=$matches isPlaying=${connection.isPlaying.value}")
                 if (!matches && connection.isPlaying.value) {
                     val names = focusedArtists.first { list -> list.isNotEmpty() || focus.off }.joinToString(" & ") { it.name }
                     events.show("Play only $names now?", "Play") { playFocused() }
@@ -127,6 +129,35 @@ class FocusViewModel @Inject constructor(
 }
 
 val LocalFocusActions = staticCompositionLocalOf<FocusViewModel> { error("FocusViewModel not provided") }
+
+// the app accent while Focus is on: the first focused artist's photo tone
+@Composable
+fun focusAccent(): com.lumen.player.core.design.Accent? {
+    val artists by LocalFocusActions.current.focusedArtists.collectAsStateWithLifecycle()
+    val first = artists.firstOrNull() ?: return null
+    return remember(first.id, first.toneHue) {
+        com.lumen.player.core.design.accentFor(
+            first.toneHue?.let { com.lumen.player.core.util.CoverTone(it, first.toneSat ?: 0.5f) } ?: com.lumen.player.core.util.seededTone(first.name)
+        )
+    }
+}
+
+// a very soft accent vignette around the screen edges while Focus is on
+@Composable
+fun FocusVignette(color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier.drawBehind {
+            drawRect(
+                androidx.compose.ui.graphics.Brush.radialGradient(
+                    0.55f to androidx.compose.ui.graphics.Color.Transparent,
+                    1f to color.copy(alpha = 0.06f),
+                    center = center,
+                    radius = size.maxDimension * 0.75f,
+                )
+            )
+        }
+    )
+}
 
 // "Talk Talk ✕" pill under screen titles while Focus is on
 @Composable

@@ -84,6 +84,8 @@ class DownloadQueue @Inject constructor(
 
     suspend fun clearFinished() = dao.deleteFinished()
 
+    suspend fun remove(id: String) = dao.delete(id)
+
     suspend fun claimNext(): DownloadJobEntity? = claimMutex.withLock {
         val next = dao.nextQueued() ?: return null
         if (dao.claim(next.id, System.currentTimeMillis()) == 1) next.copy(status = JobStatus.RUNNING) else null

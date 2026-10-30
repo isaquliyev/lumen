@@ -46,7 +46,6 @@ import com.lumen.player.core.db.TrackRow
 import com.lumen.player.core.design.ArtistAvatar
 import com.lumen.player.core.design.CoverImage
 import com.lumen.player.core.design.EmptyState
-import com.lumen.player.core.design.LocalAccent
 import com.lumen.player.core.design.LumenColors
 import com.lumen.player.core.design.LumenType
 import com.lumen.player.core.design.Radii
@@ -64,7 +63,6 @@ import com.lumen.player.feature.shell.LocalNav
 import com.lumen.player.feature.shell.LocalPlayer
 import com.lumen.player.feature.shell.PlaylistRoute
 import com.lumen.player.feature.shell.PulseRoute
-import com.lumen.player.feature.shell.RecapRoute
 import com.lumen.player.feature.shell.bottomPadding
 import java.time.LocalDate
 import java.time.LocalTime
@@ -150,21 +148,6 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenSearch: () -> Unit, onOpenAdd: 
                 ) {
                     Text(parts.joinToString(" · "), style = LumenType.label, color = LumenColors.paper, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = LumenColors.paper3, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-        if (today.dayOfMonth <= 7) {
-            item(key = "recap") {
-                val month = today.minusMonths(1)
-                val name = month.format(DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH))
-                Column(
-                    Modifier.padding(horizontal = Space.side, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(Radii.card))
-                        .background(LocalAccent.current.accent.copy(alpha = 0.14f)).clickable { nav.open(RecapRoute(month.year, month.monthValue)) }
-                        .padding(18.dp).testTag("home_recap"),
-                ) {
-                    Text("YOUR MONTH IN MUSIC", style = LumenType.overline, color = LocalAccent.current.accent)
-                    Text("$name recap", style = LumenType.display, color = LumenColors.paper)
-                    Text("Top songs, artists and minutes →", style = LumenType.label, color = LumenColors.paper2)
                 }
             }
         }

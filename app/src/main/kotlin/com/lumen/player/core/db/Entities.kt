@@ -55,6 +55,7 @@ data class ArtistEntity(
     @ColumnInfo(name = "has_image") val hasImage: Boolean,
     @ColumnInfo(name = "tone_hue") val toneHue: Float?,
     @ColumnInfo(name = "tone_sat") val toneSat: Float?,
+    @ColumnInfo(name = "hide_songs", defaultValue = "0") val hideSongs: Boolean = false,
 )
 
 @Entity(tableName = "track_artists", primaryKeys = ["track_id", "artist_id"], indices = [Index("artist_id")])
@@ -73,6 +74,7 @@ data class AlbumEntity(
     @ColumnInfo(name = "release_date") val releaseDate: String?,
     val genre: String?,
     @ColumnInfo(name = "cover_track_id") val coverTrackId: String?,
+    @ColumnInfo(name = "hide_songs", defaultValue = "0") val hideSongs: Boolean = false,
 )
 
 @Entity(tableName = "playlists")
@@ -82,6 +84,7 @@ data class PlaylistEntity(
     val description: String = "",
     @ColumnInfo(name = "has_custom_cover") val hasCustomCover: Boolean = false,
     val pinned: Boolean = false,
+    @ColumnInfo(name = "hide_songs", defaultValue = "0") val hideSongs: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )

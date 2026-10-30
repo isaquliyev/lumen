@@ -125,7 +125,7 @@ class SearchViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // normalised text is computed once per library change, not per keystroke
-    private val songIndex = tracks.songs.map { songs -> songs.map { Indexed(it, normalize("${it.title} ${it.artistLine} ${it.albumTitle}")) } }
+    private val songIndex = tracks.songsWithHidden.map { songs -> songs.map { Indexed(it, normalize("${it.title} ${it.artistLine} ${it.albumTitle}")) } }
     private val artistIndex = artistDao.observeAll().map { all -> all.map { Indexed(it, normalize(it.name)) } }
     private val albumIndex = focusRepository.focus.flatMapLatest { albumDao.observeAll(it.off, it.idList) }
         .map { all -> all.map { Indexed(it, normalize("${it.title} ${it.artistName}")) } }

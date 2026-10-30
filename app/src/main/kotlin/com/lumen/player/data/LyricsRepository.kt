@@ -20,7 +20,13 @@ class LyricsRepository @Inject constructor(private val paths: LumenPaths) {
             LyricsKind.PLAIN -> paths.plainLyrics(track.id)
             else -> null
         }
-        val text = file?.takeIf { it.exists() }?.readText()
-        TrackLyrics(if (text == null && file != null) LyricsKind.NONE else track.lyricsKind, text?.let(::parseLyrics))
+        val parsed = file?.takeIf { it.exists() }?.readText()?.let(::parseLyrics)
+        // only timed lyrics with real text are shown; anything else counts as no lyrics
+        val usable = parsed != null && parsed.synced && parsed.lines.any { it.text.isNotBlank() }
+        when {
+            usable -> TrackLyrics(LyricsKind.SYNCED, parsed)
+            track.lyricsKind == LyricsKind.INSTRUMENTAL -> TrackLyrics(LyricsKind.INSTRUMENTAL, null)
+            else -> TrackLyrics(LyricsKind.NONE, null)
+        }
     }
 }

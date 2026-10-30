@@ -35,6 +35,8 @@ data class SearchResults(
     val error: String? = null,
 )
 
+data class AlbumSheet(val album: DzAlbum, val tracks: List<DzTrack> = emptyList(), val loading: Boolean = true, val error: String? = null)
+
 @OptIn(FlowPreview::class)
 @HiltViewModel
 class AddViewModel @Inject constructor(
@@ -51,8 +53,11 @@ class AddViewModel @Inject constructor(
     val results: StateFlow<SearchResults> = _results.asStateFlow()
     val ready = ytdlp.ready
     val jobs: StateFlow<List<DownloadJobEntity>> = queue.jobs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val inLibrary: StateFlow<Set<Long>> = jobDao.observeLibraryDeezerIds().map { it.toSet() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+    // Deezer id -> the song's id in the library, for songs already downloaded
+    val inLibrary: StateFlow<Map<Long, String>> = jobDao.observeLibraryDeezerLinks().map { list -> list.associate { it.deezerId to it.trackId } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+    private val _album = MutableStateFlow<AlbumSheet?>(null)
+    val album: StateFlow<AlbumSheet?> = _album.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -71,8 +76,26 @@ class AddViewModel @Inject constructor(
         }
     }
 
-    fun add(track: DzTrack) = viewModelScope.launch {
-        queue.enqueue(DownloadRequest.DeezerPick(track.id), track.title, track.artist.name, track.album?.coverMedium)
+    fun add(track: DzTrack, cover: String? = track.album?.coverMedium) = viewModelScope.launch {
+        queue.enqueue(DownloadRequest.DeezerPick(track.id), track.title, track.artist.name, cover)
+    }
+
+    // album tracks from Deezer have no album object, so the cover comes from the album
+    fun addAll(tracks: List<DzTrack>, cover: String?, skip: Set<Long>) = viewModelScope.launch {
+        val missing = tracks.filter { it.id !in inLibrary.value && it.id !in skip }
+        missing.forEach { queue.enqueue(DownloadRequest.DeezerPick(it.id), it.title, it.artist.name, cover) }
+        events.show(if (missing.isEmpty()) "You already have these songs" else "Added ${missing.size} songs to downloads")
+    }
+
+    fun openAlbum(album: DzAlbum) = viewModelScope.launch {
+        _album.value = AlbumSheet(album)
+        _album.value = runCatching { AlbumSheet(album, deezer.album(album.id).tracks?.data.orEmpty(), loading = false) }
+            .getOrElse { e -> AlbumSheet(album, loading = false, error = if (e.isOffline()) "No internet connection." else "Couldn't load this album.") }
+            .takeIf { _album.value?.album?.id == album.id }
+    }
+
+    fun closeAlbum() {
+        _album.value = null
     }
 
     fun addAlbum(album: DzAlbum) = viewModelScope.launch {
@@ -92,4 +115,5 @@ class AddViewModel @Inject constructor(
     fun retry(id: String) = viewModelScope.launch { queue.retry(id) }
     fun choose(id: String, videoId: String) = viewModelScope.launch { queue.choose(id, videoId) }
     fun clearFinished() = viewModelScope.launch { queue.clearFinished() }
+    fun remove(id: String) = viewModelScope.launch { queue.remove(id) }
 }

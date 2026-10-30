@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
-import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.CenterFocusStrong
@@ -72,7 +71,7 @@ import com.lumen.player.feature.add.ChooseAudioSheet
 import com.lumen.player.feature.shell.AlbumRoute
 import com.lumen.player.feature.shell.ArtistRoute
 import com.lumen.player.feature.shell.LocalNav
-import com.lumen.player.feature.shell.LocalPlayer
+import com.lumen.player.playback.QueueManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -93,6 +92,7 @@ class TrackMenuViewModel @Inject constructor(
     private val tracks: TrackRepository,
     private val focus: FocusRepository,
     private val events: AppEvents,
+    private val queue: QueueManager,
 ) : ViewModel() {
     val track = MutableStateFlow<TrackRow?>(null)
     val candidates = MutableStateFlow<List<CandidateUi>?>(null)
@@ -107,7 +107,15 @@ class TrackMenuViewModel @Inject constructor(
         events.show(if (ids.size == 1) "Deleted from device" else "Deleted ${ids.size} songs")
     }
 
-    fun editInfo(row: TrackRow, title: String, genre: String) = viewModelScope.launch { tracks.editInfo(row.id, title, genre) }
+    fun editInfo(row: TrackRow, title: String, genre: String) = viewModelScope.launch {
+        tracks.editInfo(row.id, title, genre)
+        events.show("Info saved")
+    }
+
+    fun addToQueue(row: TrackRow) = viewModelScope.launch {
+        queue.enqueue(listOf(row))
+        events.show("Added to queue")
+    }
 
     fun refetchLyrics(row: TrackRow) = viewModelScope.launch {
         events.show("Looking for lyrics…")
@@ -122,13 +130,17 @@ class TrackMenuViewModel @Inject constructor(
         )
     }
 
-    fun setOffset(row: TrackRow, offset: Long) = viewModelScope.launch { tracks.setLyricsOffset(row.id, offset) }
+    fun setOffset(row: TrackRow, offset: Long) = viewModelScope.launch {
+        tracks.setLyricsOffset(row.id, offset)
+        events.show("Lyrics offset saved")
+    }
 
+    // null while searching; the sheet is already open so a link can be pasted meanwhile
     fun loadCandidates(row: TrackRow) = viewModelScope.launch {
-        events.show("Searching YouTube…")
+        candidates.value = null
         candidates.value = runCatching { actions.audioCandidates(row) }.getOrElse {
             events.show("Couldn't search YouTube right now")
-            null
+            emptyList()
         }
     }
 
@@ -140,6 +152,7 @@ class TrackMenuViewModel @Inject constructor(
 
     fun focusOn(row: TrackRow) = viewModelScope.launch {
         val id = row.primaryArtistId ?: return@launch
+        events.show("Focus on ${row.artistLine?.substringBefore(", ") ?: "artist"}")
         focus.only(id)
     }
 }
@@ -153,7 +166,6 @@ fun TrackMenuHost(viewModel: TrackMenuViewModel = hiltViewModel(), content: @Com
     var offsetFor by remember { mutableStateOf<TrackRow?>(null) }
     var deleting by remember { mutableStateOf<TrackRow?>(null) }
     var replacing by remember { mutableStateOf<TrackRow?>(null) }
-    val player = LocalPlayer.current
     val nav = LocalNav.current
     val addToPlaylist = LocalAddToPlaylist.current
 
@@ -180,8 +192,7 @@ fun TrackMenuHost(viewModel: TrackMenuViewModel = hiltViewModel(), content: @Com
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                MenuRow(Icons.AutoMirrored.Rounded.PlaylistPlay, "Play next", "menu_play_next") { player.playNext(listOf(row)); close() }
-                MenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue", "menu_add_queue") { player.addToQueue(listOf(row)); close() }
+                MenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue", "menu_add_queue") { viewModel.addToQueue(row); close() }
                 MenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist…", "menu_add_playlist") { close(); addToPlaylist(listOf(row.id)) }
                 val liked = row.likedAt != null
                 MenuRow(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Unlike" else "Like", "menu_like") {
@@ -219,10 +230,8 @@ fun TrackMenuHost(viewModel: TrackMenuViewModel = hiltViewModel(), content: @Com
             onDismiss = { deleting = null },
         ) { viewModel.delete(listOf(row.id)); deleting = null }
     }
-    val replaceRow = replacing
-    val list = candidates
-    if (replaceRow != null && list != null) {
-        ChooseAudioSheet(list, onDismiss = { replacing = null; viewModel.candidates.value = null }) { videoId ->
+    replacing?.let { replaceRow ->
+        ChooseAudioSheet(candidates, onDismiss = { replacing = null; viewModel.candidates.value = null }) { videoId ->
             viewModel.replaceAudio(replaceRow, videoId); replacing = null
         }
     }

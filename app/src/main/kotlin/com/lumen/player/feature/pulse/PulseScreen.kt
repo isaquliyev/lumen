@@ -24,10 +24,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +68,7 @@ import com.lumen.player.core.design.trackThumb
 import com.lumen.player.core.util.formatBytes
 import com.lumen.player.core.util.formatCount
 import com.lumen.player.core.util.formatLength
+import com.lumen.player.data.MIN_PULSE_MS
 import com.lumen.player.data.PulseData
 import com.lumen.player.data.RangeKind
 import com.lumen.player.feature.focus.FocusPill
@@ -78,7 +77,6 @@ import com.lumen.player.feature.shell.ArtistRoute
 import com.lumen.player.feature.shell.LocalBottomSpace
 import com.lumen.player.feature.shell.LocalNav
 import com.lumen.player.feature.shell.LocalPlayer
-import com.lumen.player.feature.shell.RecapRoute
 import com.lumen.player.feature.shell.bottomPadding
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -91,7 +89,6 @@ fun PulseScreen(viewModel: PulseViewModel = hiltViewModel()) {
     val offset by viewModel.offset.collectAsStateWithLifecycle()
     val scoped by viewModel.scoped.collectAsStateWithLifecycle()
     val focus by viewModel.focus.collectAsStateWithLifecycle()
-    var infoOpen by remember { mutableStateOf(false) }
     var allSongs by remember { mutableStateOf(false) }
     val nav = LocalNav.current
     val player = LocalPlayer.current
@@ -99,12 +96,7 @@ fun PulseScreen(viewModel: PulseViewModel = hiltViewModel()) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = bottomPadding(LocalBottomSpace.current)) {
         item {
             Column(Modifier.statusBarsPadding().padding(top = 16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ScreenTitle("Pulse", Modifier.weight(1f))
-                    IconButton(onClick = { infoOpen = true }, modifier = Modifier.padding(end = 8.dp).testTag("pulse_info")) {
-                        Icon(Icons.Rounded.Info, "How it's counted", tint = LumenColors.paper2)
-                    }
-                }
+                ScreenTitle("Pulse")
                 FocusPill(Modifier.padding(start = Space.side, top = 4.dp))
                 Spacer(Modifier.height(12.dp))
                 SegmentedTabs(RangeKind.entries.map { it.label }, kind.ordinal, { viewModel.setKind(RangeKind.entries[it]) })
@@ -131,22 +123,6 @@ fun PulseScreen(viewModel: PulseViewModel = hiltViewModel()) {
             return@LazyColumn
         }
         item { Hero(d) }
-        if (kind == RangeKind.MONTH || kind == RangeKind.YEAR) {
-            item {
-                val first = d.period.days.first()
-                val label = if (kind == RangeKind.MONTH) first.format(DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH)) else first.year.toString()
-                Row(
-                    Modifier.padding(horizontal = Space.side, vertical = 8.dp).clip(RoundedCornerShape(12.dp))
-                        .clickable { nav.open(RecapRoute(first.year, if (kind == RangeKind.MONTH) first.monthValue else 0)) }
-                        .padding(vertical = 8.dp).testTag("pulse_recap"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Your $label recap", style = LumenType.title, color = LocalAccent.current.accent)
-                    Spacer(Modifier.width(8.dp))
-                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = LocalAccent.current.accent)
-                }
-            }
-        }
         if (d.topSongs.isNotEmpty()) {
             item { Section("Top songs", if (d.topSongs.size > 5) (if (allSongs) "Show less" else "See all") else null) { allSongs = !allSongs } }
             val songs = if (allSongs) d.topSongs else d.topSongs.take(5)
@@ -155,7 +131,7 @@ fun PulseScreen(viewModel: PulseViewModel = hiltViewModel()) {
                     ranked.row,
                     onClick = { player.play(songs.map { it.row }, index, PlayContext.QUEUE, null, "Pulse · top songs") },
                     leading = { Text("${index + 1}", style = LumenType.numeric, color = LumenColors.paper3, modifier = Modifier.width(26.dp)) },
-                    trailing = { Text(formatCount(ranked.plays, "play"), style = LumenType.numeric, color = LumenColors.paper2) },
+                    trailing = { Text(formatLength(ranked.listenedMs), style = LumenType.numeric, color = LumenColors.paper2) },
                 )
             }
         }
@@ -195,23 +171,13 @@ fun PulseScreen(viewModel: PulseViewModel = hiltViewModel()) {
         }
         item { Section("Listening clock") }
         item {
-            Column(Modifier.padding(horizontal = 48.dp)) {
-                RadialClock(d.hours, LocalTime.now().hour)
-                d.peakHour?.let { Text("Peak: %02d:00".format(it), style = LumenType.label, color = LumenColors.paper2, modifier = Modifier.align(Alignment.CenterHorizontally)) }
-            }
+            RadialClock(d.hours, LocalTime.now().hour, Modifier.padding(horizontal = 40.dp))
         }
         item { Section("Week rhythm") }
         item { BarRow(d.weekdays, listOf("M", "T", "W", "T", "F", "S", "S"), Modifier.padding(horizontal = Space.side)) }
         if (kind != RangeKind.TODAY && kind != RangeKind.WEEK) {
             item { Section("Calendar") }
             item { CalendarHeatmap(d.period.days, d.days, yearMode = kind != RangeKind.MONTH, modifier = Modifier.padding(horizontal = Space.side)) }
-        }
-        if (d.period.days.size > 1) {
-            item { Section("Trend", overline = "Minutes per day") }
-            item {
-                val today = java.time.LocalDate.now()
-                Sparkline(d.period.days.filter { !it.isAfter(today) }.takeLast(366).map { (d.days[it] ?: 0L) / 60_000f }, Modifier.padding(horizontal = Space.side))
-            }
         }
         item { Section("Streaks") }
         item {
@@ -242,28 +208,6 @@ fun PulseScreen(viewModel: PulseViewModel = hiltViewModel()) {
                 "Most active day" to (d.mostActiveDay?.let { it.day.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)) } ?: "–"),
             )
         }
-        d.repeatMoment?.let { (row, moment) ->
-            item { Section("On repeat moment") }
-            item {
-                Text(
-                    "You played ${row.title} ${moment.plays} times on ${moment.day.format(DateTimeFormatter.ofPattern("d MMMM", Locale.ENGLISH))}.",
-                    style = LumenType.display, color = LumenColors.paper, modifier = Modifier.padding(horizontal = Space.side),
-                )
-            }
-        }
-        d.personality?.let { personality ->
-            item { Section("Listening personality") }
-            item {
-                Column(Modifier.padding(horizontal = Space.side)) {
-                    Text(personality.main.name, style = LumenType.displayLarge, color = LocalAccent.current.accent)
-                    Text(personality.main.line, style = LumenType.body, color = LumenColors.paper2)
-                    if (personality.traits.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text("Also: " + personality.traits.joinToString(" · ") { it.name }, style = LumenType.label, color = LumenColors.paper2)
-                    }
-                }
-            }
-        }
         item { Section("Library") }
         item {
             StatRow(
@@ -274,8 +218,6 @@ fun PulseScreen(viewModel: PulseViewModel = hiltViewModel()) {
         }
         if (d.growth.size > 1) item { Sparkline(d.growth.map { it.second.toFloat() }, Modifier.padding(horizontal = Space.side)) }
     }
-
-    if (infoOpen) HowItsCounted { infoOpen = false }
 }
 
 @Composable
@@ -312,10 +254,10 @@ private fun NotEnough(totalMs: Long) {
     Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Not enough listening yet", style = LumenType.display, color = LumenColors.paper, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        Text("${totalMs / 60_000} of 20 minutes", style = LumenType.label, color = LumenColors.paper2)
+        Text("${totalMs / 60_000} of ${MIN_PULSE_MS / 60_000} minutes", style = LumenType.label, color = LumenColors.paper2)
         Spacer(Modifier.height(12.dp))
         LinearProgressIndicator(
-            progress = { (totalMs / (20 * 60_000f)).coerceIn(0f, 1f) },
+            progress = { (totalMs.toFloat() / MIN_PULSE_MS).coerceIn(0f, 1f) },
             modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
             color = accent, trackColor = LumenColors.ink3, drawStopIndicator = {}, gapSize = 0.dp,
         )

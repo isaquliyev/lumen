@@ -5,13 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.lumen.player.core.db.PlayContext
 import com.lumen.player.core.db.TrackArtistDao
 import com.lumen.player.core.db.TrackArtistName
-import com.lumen.player.core.db.TrackDao
 import com.lumen.player.core.db.TrackRow
 import com.lumen.player.core.design.Accent
 import com.lumen.player.core.design.accentFor
 import com.lumen.player.core.util.CoverTone
 import com.lumen.player.core.util.seededTone
 import com.lumen.player.data.LyricsRepository
+import com.lumen.player.data.SettingsRepository
 import com.lumen.player.data.TrackLyrics
 import com.lumen.player.data.TrackRepository
 import com.lumen.player.playback.PlaybackContextHolder
@@ -36,10 +36,10 @@ class PlayerViewModel @Inject constructor(
     private val queue: QueueManager,
     private val tracks: TrackRepository,
     private val extras: PlaybackExtras,
-    trackDao: TrackDao,
     trackArtistDao: TrackArtistDao,
     lyricsRepository: LyricsRepository,
     contextHolder: PlaybackContextHolder,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
     val nowPlaying = connection.nowPlaying
     val isPlaying = connection.isPlaying
@@ -49,11 +49,9 @@ class PlayerViewModel @Inject constructor(
     val queueUi = connection.queueUi
     val context = contextHolder.flow
     val sleep = extras.sleep
+    val shuffleMode: StateFlow<Boolean> = settings.settings.map { it.songsShuffle }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val currentId = nowPlaying.map { it?.id }.distinctUntilChanged()
-
-    val waveform: StateFlow<ByteArray?> = currentId.mapLatest { id -> id?.let { trackDao.waveform(it) } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val lyrics: StateFlow<TrackLyrics?> = nowPlaying.map { it?.let { row -> row.id to row.lyricsKind } }.distinctUntilChanged()
         .mapLatest { pair -> pair?.let { nowPlaying.value?.let { row -> lyricsRepository.load(row) } } }
@@ -68,6 +66,11 @@ class PlayerViewModel @Inject constructor(
     }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun position(intervalMs: Long = 250) = connection.position(intervalMs)
+
+    fun setShuffleMode(on: Boolean, type: PlayContext, id: String?) = viewModelScope.launch {
+        settings.setSongsShuffle(on)
+        if (context.value.type == type && context.value.id == id && shuffle.value != on) queue.setShuffle(on)
+    }
 
     fun play(rows: List<TrackRow>, index: Int, context: PlayContext, contextId: String?, name: String, shuffle: Boolean = false) =
         viewModelScope.launch { queue.play(rows, index, context, contextId, name, shuffle) }

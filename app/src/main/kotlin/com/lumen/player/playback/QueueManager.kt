@@ -2,6 +2,7 @@ package com.lumen.player.playback
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.media3.common.MediaItem
@@ -38,6 +39,7 @@ class QueueManager @Inject constructor(
     private val store: DataStore<Preferences>,
 ) {
     private val key = stringPreferencesKey("saved_queue")
+    private val repeatAllMigrated = booleanPreferencesKey("repeat_all_default")
     private var originalOrder: List<String> = emptyList()
     private val _shuffle = MutableStateFlow(false)
     val shuffle: StateFlow<Boolean> = _shuffle.asStateFlow()
@@ -107,6 +109,35 @@ class QueueManager @Inject constructor(
             player.replaceMediaItems(tailStart, player.mediaItemCount, after)
             player.replaceMediaItems(0, current, before)
         }
+    }
+
+    // Artist Focus: drops the queue songs that are not in ids (the current song and songs the user
+    // queued stay); when no focused song is left, the other focused songs from the library are added
+    suspend fun keepOnly(ids: Set<String>, fallback: List<TrackRow>) {
+        val player = holder.player.value ?: return
+        if (player.mediaItemCount == 0) return
+        val current = player.currentMediaItemIndex
+        fun keep(item: MediaItem) = isUserQueued(item.mediaId) || trackIdOf(item.mediaId) in ids
+        val before = (0 until current).map { player.getMediaItemAt(it) }.filter(::keep)
+        val after = (current + 1 until player.mediaItemCount).map { player.getMediaItemAt(it) }.filter(::keep)
+        player.replaceMediaItems(current + 1, player.mediaItemCount, after)
+        player.replaceMediaItems(0, current, before)
+        originalOrder = originalOrder.filter { it in ids }
+        if (before.none { !isUserQueued(it.mediaId) } && after.none { !isUserQueued(it.mediaId) }) {
+            val currentId = trackIdOf(player.currentMediaItem?.mediaId ?: return)
+            val others = fallback.filter { it.id != currentId }.let { if (_shuffle.value) it.shuffled() else it }
+            player.addMediaItems(others.map { it.toMediaItem(paths) })
+            originalOrder = listOf(currentId) + others.map { it.id }
+            contextHolder.set(PlayContext.ARTIST, fallback.firstOrNull()?.primaryArtistId, "Focus")
+        }
+    }
+
+    // queues saved before "repeat all" became the default have "off" only because it was the old
+    // default, so it is turned into "repeat all" once; after that the saved choice is kept
+    suspend fun restoredRepeatMode(saved: Int): Int {
+        if (store.data.first()[repeatAllMigrated] == true) return saved
+        store.edit { it[repeatAllMigrated] = true }
+        return if (saved == Player.REPEAT_MODE_OFF) Player.REPEAT_MODE_ALL else saved
     }
 
     fun cycleRepeat(player: Player) {

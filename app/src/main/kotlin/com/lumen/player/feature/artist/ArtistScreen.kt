@@ -18,9 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -40,6 +38,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.lumen.player.core.AppEvents
 import com.lumen.player.core.db.AlbumDao
 import com.lumen.player.core.db.AlbumRow
 import com.lumen.player.core.db.ArtistDao
@@ -50,12 +49,12 @@ import com.lumen.player.core.db.TrackArtistDao
 import com.lumen.player.core.db.TrackDao
 import com.lumen.player.core.db.TrackRow
 import com.lumen.player.core.design.CoverImage
+import com.lumen.player.core.design.HideToggle
 import com.lumen.player.core.design.LocalAccent
 import com.lumen.player.core.design.LocalPaths
 import com.lumen.player.core.design.LumenColors
 import com.lumen.player.core.design.LumenType
 import com.lumen.player.core.design.PillButton
-import com.lumen.player.core.design.PillStyle
 import com.lumen.player.core.design.SectionHeader
 import com.lumen.player.core.design.Space
 import com.lumen.player.core.design.TrackRowItem
@@ -64,9 +63,9 @@ import com.lumen.player.core.util.CoverTone
 import com.lumen.player.core.util.formatCount
 import com.lumen.player.core.util.formatLength
 import com.lumen.player.core.util.seededTone
-import com.lumen.player.feature.focus.LocalFocusActions
 import com.lumen.player.feature.library.AlbumTile
 import com.lumen.player.feature.library.LocalTrackMenu
+import com.lumen.player.feature.player.PlayModeButton
 import com.lumen.player.feature.shell.AlbumRoute
 import com.lumen.player.feature.shell.ArtistRoute
 import com.lumen.player.feature.shell.LocalBottomSpace
@@ -79,6 +78,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -91,18 +91,18 @@ data class ArtistState(
     val appearsOn: List<TrackRow> = emptyList(),
     val albums: List<AlbumRow> = emptyList(),
     val listenedMs: Long = 0,
-    val plays: Int = 0,
     val firstListen: Long? = null,
 )
 
 @HiltViewModel
 class ArtistViewModel @Inject constructor(
     handle: SavedStateHandle,
-    artistDao: ArtistDao,
+    private val artistDao: ArtistDao,
     trackDao: TrackDao,
     trackArtistDao: TrackArtistDao,
     albumDao: AlbumDao,
     stats: StatsDao,
+    private val events: AppEvents,
 ) : ViewModel() {
     val id = handle.toRoute<ArtistRoute>().id
 
@@ -121,15 +121,19 @@ class ArtistViewModel @Inject constructor(
         val sorted = songs.sortedWith(compareBy({ it.albumTitle ?: "" }, { it.trackPosition ?: 0 }, { it.sortTitle }))
         ArtistState(
             artist = artist,
-            songs = sorted.filter { it.id !in featured },
-            topSongs = songs.filter { (plays[it.id]?.plays ?: 0) > 0 }.sortedByDescending { plays[it.id]?.plays ?: 0 }.take(5),
+            songs = sorted.filter { it.id !in featured }.sortedBy { it.sortTitle },
+            topSongs = songs.filter { (plays[it.id]?.plays ?: 0) > 0 }.sortedByDescending { plays[it.id]?.listenedMs ?: 0 }.take(5),
             appearsOn = sorted.filter { it.id in featured },
             albums = albums,
             listenedMs = listening?.listenedMs ?: 0,
-            plays = listening?.plays ?: 0,
             firstListen = first,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ArtistState())
+
+    fun setHideSongs(hide: Boolean) = viewModelScope.launch {
+        artistDao.setHideSongs(id, hide)
+        events.show(if (hide) "Songs hidden from Library" else "Songs shown in Library")
+    }
 }
 
 @Composable
@@ -137,14 +141,12 @@ fun ArtistScreen(viewModel: ArtistViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val artist = state.artist ?: return
     val player = LocalPlayer.current
+    val shuffleOn by player.shuffleMode.collectAsStateWithLifecycle()
     val nav = LocalNav.current
     val menu = LocalTrackMenu.current
-    val focusActions = LocalFocusActions.current
-    val focus by focusActions.focus.collectAsStateWithLifecycle()
     val paths = LocalPaths.current
     val tone = remember(artist) { if (artist.toneHue != null) CoverTone(artist.toneHue, artist.toneSat ?: 0.5f) else seededTone(artist.name) }
     val accent = remember(tone) { accentFor(tone) }
-    val focused = artist.id in focus.ids
     val playable = state.songs + state.appearsOn
 
     CompositionLocalProvider(LocalAccent provides accent) {
@@ -180,31 +182,32 @@ fun ArtistScreen(viewModel: ArtistViewModel = hiltViewModel()) {
                         " · since " + DateTimeFormatter.ofPattern("MMM yyyy").format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()))
                     } ?: ""
                     Text(
-                        if (state.plays > 0) "${formatLength(state.listenedMs)} · ${state.plays} plays$since" else "${formatCount(playable.size, "song")} in your library",
+                        "${formatCount(playable.size, "song")} · ${formatLength(playable.sumOf { it.durationMs })}",
                         style = LumenType.label,
                         color = LumenColors.paper2,
                     )
+                    if (state.listenedMs > 0) {
+                        Text("${formatLength(state.listenedMs)} listened$since", style = LumenType.label, color = LumenColors.paper2)
+                    }
                     Spacer(Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PillButton("Play", { player.play(playable, 0, PlayContext.ARTIST, artist.id, artist.name) },
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        PillButton("Play", { player.play(playable, -1, PlayContext.ARTIST, artist.id, artist.name, shuffle = shuffleOn) },
                             icon = Icons.Rounded.PlayArrow, modifier = Modifier.testTag("artist_play"))
-                        PillButton("Shuffle", { player.play(playable, -1, PlayContext.ARTIST, artist.id, artist.name, shuffle = true) },
-                            style = PillStyle.OUTLINED, icon = Icons.Rounded.Shuffle, modifier = Modifier.testTag("artist_shuffle"))
-                        PillButton("Focus", { focusActions.toggle(artist.id) }, style = if (focused) PillStyle.EMBER else PillStyle.OUTLINED,
-                            icon = Icons.Rounded.CenterFocusStrong, modifier = Modifier.testTag("artist_focus"))
+                        PlayModeButton(PlayContext.ARTIST, artist.id)
+                        HideToggle(artist.hideSongs, { viewModel.setHideSongs(!artist.hideSongs) })
                     }
                 }
             }
             if (state.topSongs.isNotEmpty()) {
                 item { SectionHeader("Your top songs", Modifier.padding(top = 8.dp)) }
                 itemsIndexed(state.topSongs, key = { _, it -> "top_${it.id}" }) { index, track ->
-                    TrackRowItem(track, onClick = { player.play(state.topSongs, index, PlayContext.ARTIST, artist.id, artist.name) }, onMore = { menu.open(track) })
+                    TrackRowItem(track, onClick = { player.play(state.topSongs, index, PlayContext.ARTIST, artist.id, artist.name, shuffle = shuffleOn) }, onMore = { menu.open(track) })
                 }
             }
             if (state.songs.isNotEmpty()) {
                 item { SectionHeader("All songs", Modifier.padding(top = 8.dp)) }
                 itemsIndexed(state.songs, key = { _, it -> "all_${it.id}" }) { index, track ->
-                    TrackRowItem(track, onClick = { player.play(state.songs, index, PlayContext.ARTIST, artist.id, artist.name) }, onMore = { menu.open(track) })
+                    TrackRowItem(track, onClick = { player.play(state.songs, index, PlayContext.ARTIST, artist.id, artist.name, shuffle = shuffleOn) }, onMore = { menu.open(track) })
                 }
             }
             if (state.albums.isNotEmpty()) {
@@ -218,7 +221,7 @@ fun ArtistScreen(viewModel: ArtistViewModel = hiltViewModel()) {
             if (state.appearsOn.isNotEmpty()) {
                 item { SectionHeader("Appears on", Modifier.padding(top = 8.dp)) }
                 itemsIndexed(state.appearsOn, key = { _, it -> "feat_${it.id}" }) { index, track ->
-                    TrackRowItem(track, onClick = { player.play(state.appearsOn, index, PlayContext.ARTIST, artist.id, artist.name) }, onMore = { menu.open(track) })
+                    TrackRowItem(track, onClick = { player.play(state.appearsOn, index, PlayContext.ARTIST, artist.id, artist.name, shuffle = shuffleOn) }, onMore = { menu.open(track) })
                 }
             }
         }

@@ -41,6 +41,8 @@ class PlaylistRepository @Inject constructor(
 
     suspend fun setPinned(id: String, pinned: Boolean) = playlists.setPinned(id, pinned)
 
+    suspend fun setHideSongs(id: String, hide: Boolean) = playlists.setHideSongs(id, hide)
+
     suspend fun delete(id: String) {
         paths.playlistCover(id).delete()
         playlists.deleteWithEntries(id)

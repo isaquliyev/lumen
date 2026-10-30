@@ -18,6 +18,9 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// less listening than this in a period: Pulse shows a progress message instead of the stats
+const val MIN_PULSE_MS = 15 * 60_000L
+
 data class RankedTrack(val row: TrackRow, val plays: Int, val listenedMs: Long)
 data class RankedArtist(val id: String, val name: String, val hasImage: Boolean, val listenedMs: Long, val plays: Int)
 data class RankedAlbum(val id: String, val title: String, val artist: String?, val coverTrackId: String?, val listenedMs: Long)
@@ -53,8 +56,7 @@ data class PulseData(
     val growth: List<Pair<String, Int>> = emptyList(),
     val focusCard: FocusCard? = null,
 ) {
-    val enough get() = totalMs >= 20 * 60_000L
-    val peakHour get() = hours.indices.maxByOrNull { hours[it] }?.takeIf { hours[it] > 0 }
+    val enough get() = totalMs >= MIN_PULSE_MS
 }
 
 @Singleton
@@ -85,7 +87,7 @@ class PulseRepository @Inject constructor(
                 stats.totalListened(prev.from, end, off, ids).first()
             }
             val events = stats.events(from, to, off, ids).first()
-            val topTracks = stats.topTracks(from, to, 50, off, ids).first()
+            val topTracks = stats.topTracksByTime(from, to, 50, off, ids).first()
             val rows = trackRepository.rows(topTracks.map { it.trackId }).associateBy { it.id }
             val topArtistRows = stats.topArtists(from, to, 5, off, ids).first()
             val artistNames = artists.observeByIds(topArtistRows.map { it.artistId }).first().associateBy { it.id }
@@ -154,7 +156,7 @@ class PulseRepository @Inject constructor(
 
     private suspend fun focusCard(focus: Focus, from: Long, to: Long): FocusCard {
         val names = artists.observeByIds(focus.idList).first().joinToString(" & ") { it.name }
-        val top = stats.topTracks(from, to, 1, false, focus.idList).first().firstOrNull()
+        val top = stats.topTracksByTime(from, to, 1, false, focus.idList).first().firstOrNull()
         return FocusCard(
             names = names,
             listenedMs = stats.totalListened(from, to, false, focus.idList).first(),
@@ -162,13 +164,5 @@ class PulseRepository @Inject constructor(
             topSong = top?.let { trackRepository.rows(listOf(it.trackId)).firstOrNull() },
             firstListen = focus.idList.mapNotNull { stats.firstListenOfArtist(it).first() }.minOrNull(),
         )
-    }
-
-    // minutes for a whole finished month, for the recap notification
-    suspend fun monthTotal(year: Int, month: Int, zone: ZoneId = ZoneId.systemDefault()): Long {
-        val start = LocalDate.of(year, month, 1)
-        val from = start.atStartOfDay(zone).toInstant().toEpochMilli()
-        val to = start.plusMonths(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        return stats.totalListened(from, to, true, emptyList()).first()
     }
 }

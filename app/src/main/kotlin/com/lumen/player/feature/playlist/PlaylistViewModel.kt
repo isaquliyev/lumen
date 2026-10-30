@@ -12,6 +12,7 @@ import com.lumen.player.core.db.TrackRow
 import com.lumen.player.core.storage.LumenPaths
 import com.lumen.player.data.FocusRepository
 import com.lumen.player.data.PlaylistRepository
+import com.lumen.player.data.SettingsRepository
 import com.lumen.player.data.TrackRepository
 import com.lumen.player.feature.shell.PlaylistRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -53,19 +54,21 @@ class PlaylistViewModel @Inject constructor(
     tracks: TrackRepository,
     focusRepository: FocusRepository,
     artistDao: com.lumen.player.core.db.ArtistDao,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
     val id = handle.toRoute<PlaylistRoute>().id
-    val sort = MutableStateFlow(PlaylistSort.CUSTOM)
+    private val sortFlow = settings.playlistSort(id).map { s -> s?.let { runCatching { PlaylistSort.valueOf(it) }.getOrNull() } ?: PlaylistSort.CUSTOM }
+    val sort: StateFlow<PlaylistSort> = sortFlow.stateIn(viewModelScope, SharingStarted.Eagerly, PlaylistSort.CUSTOM)
     val showAll = MutableStateFlow(false)
     val editing = MutableStateFlow(false)
 
     private val focusIds = focusRepository.focus.flatMapLatest { f ->
-        if (f.off) flowOf(null) else tracks.songs.map { list -> list.map { it.id }.toSet() }
+        if (f.off) flowOf(null) else tracks.songsWithHidden.map { list -> list.map { it.id }.toSet() }
     }
     private val focusNames = focusRepository.focus.flatMapLatest { f ->
         if (f.off) flowOf(null) else artistDao.observeByIds(f.idList).map { list -> list.joinToString(" & ") { it.name } }
     }
-    private val view = combine(sort, showAll, editing) { s, all, edit -> Triple(s, all, edit) }
+    private val view = combine(sortFlow, showAll, editing) { s, all, edit -> Triple(s, all, edit) }
 
     val state: StateFlow<PlaylistState> = combine(
         repository.observe(id),
@@ -90,11 +93,18 @@ class PlaylistViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaylistState())
 
+    fun setSort(value: PlaylistSort) = viewModelScope.launch { settings.setPlaylistSort(id, value.name) }
+
     fun rename(name: String, description: String) = viewModelScope.launch { repository.rename(id, name, description) }
 
     fun setPinned(pinned: Boolean) = viewModelScope.launch {
         repository.setPinned(id, pinned)
         events.show(if (pinned) "Pinned" else "Unpinned")
+    }
+
+    fun setHideSongs(hide: Boolean) = viewModelScope.launch {
+        repository.setHideSongs(id, hide)
+        events.show(if (hide) "Songs hidden from Library" else "Songs shown in Library")
     }
 
     fun delete(onDone: () -> Unit) = viewModelScope.launch {

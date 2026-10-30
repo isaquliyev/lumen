@@ -12,7 +12,7 @@ artists/    artist photos
 lyrics/     song lyrics (.lrc = synced, .txt = plain)
 playlists/  custom playlist covers
 data/       automatic backup of the Lumen database
-exports/    recap images you shared
+exports/    log files you exported
 
 Please don't rename or move files here. Lumen finds them by their names.
 Copy this whole folder to keep a backup of your library.

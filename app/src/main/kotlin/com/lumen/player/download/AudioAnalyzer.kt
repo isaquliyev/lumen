@@ -12,7 +12,7 @@ import kotlin.math.sqrt
 
 data class AudioAnalysis(val waveform: ByteArray, val gainDb: Float, val durationMs: Long)
 
-// one decode pass: 96-bar waveform + gain towards -14 dB (never above 0, so no clipping)
+// one decode pass: 96-bar waveform + gain towards -14 dB (from -12 to +12 dB)
 fun analyseAudio(file: File, bars: Int = 96, targetDb: Float = -14f): AudioAnalysis {
     val extractor = MediaExtractor().apply { setDataSource(file.absolutePath) }
     val index = (0 until extractor.trackCount).first {
@@ -83,6 +83,6 @@ fun analyseAudio(file: File, bars: Int = 96, targetDb: Float = -14f): AudioAnaly
     val peak = rms.maxOrNull()?.takeIf { it > 0 } ?: 1.0
     val waveform = ByteArray(bars) { ((rms[it] / peak).pow(0.7) * 255).toInt().toByte() }
     val overallDb = 20 * log10(sqrt(totalSquares / totalCount.coerceAtLeast(1)).coerceAtLeast(1e-9))
-    val gain = (targetDb - overallDb).toFloat().coerceIn(-12f, 0f)
+    val gain = (targetDb - overallDb).toFloat().coerceIn(-12f, 12f)
     return AudioAnalysis(waveform, gain, durationUs / 1000)
 }

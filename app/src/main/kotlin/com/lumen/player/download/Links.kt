@@ -24,6 +24,22 @@ fun classifyLink(url: String): LinkKind? {
     }
 }
 
+private val VIDEO_ID = Regex("""^[A-Za-z0-9_-]{11}$""")
+
+// the 11-character video id from youtu.be/ID, youtube.com/watch?v=ID, /shorts/ID, /embed/ID or /live/ID
+fun youtubeVideoId(text: String): String? {
+    val url = firstUrl(text.trim()) ?: return null
+    if (classifyLink(url) != LinkKind.YOUTUBE) return null
+    val host = url.substringAfter("://").substringBefore('/').lowercase()
+    val path = url.substringAfter("://").substringAfter('/', "").substringBefore('?').substringBefore('#')
+    val id = when {
+        host == "youtu.be" -> path.substringBefore('/')
+        path == "watch" -> url.substringAfter('?', "").split('&').firstOrNull { it.startsWith("v=") }?.removePrefix("v=")
+        else -> path.split('/').takeIf { it.size >= 2 && it[0] in setOf("shorts", "embed", "live", "v") }?.get(1)
+    }
+    return id?.takeIf { VIDEO_ID.matches(it) }
+}
+
 // turns a shared or pasted link into download jobs; returns the message for the snackbar
 @Singleton
 class LinkHandler @Inject constructor(

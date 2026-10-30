@@ -97,6 +97,14 @@ class PlayerConnection @Inject constructor(
         }, ContextCompat.getMainExecutor(context))
     }
 
+    // lets go of the service when the app's screen is closed; a playing service stays on its own
+    fun release() {
+        _controller.value?.removeListener(listener)
+        future?.let { MediaController.releaseFuture(it) }
+        future = null
+        _controller.value = null
+    }
+
     private fun sync(player: Player) {
         _isPlaying.value = player.isPlaying
         _mediaId.value = player.currentMediaItem?.mediaId
@@ -123,7 +131,15 @@ class PlayerConnection @Inject constructor(
         }
     }
 
-    fun next() = _controller.value?.seekToNext()
+    // at the end of the queue, Next goes back to the first song
+    fun next() {
+        val c = _controller.value ?: return
+        if (c.hasNextMediaItem()) c.seekToNext()
+        else if (c.mediaItemCount > 0) {
+            c.seekTo(0, 0)
+            c.play()
+        }
+    }
     fun previous() = _controller.value?.seekToPrevious()
     fun seekTo(ms: Long) = _controller.value?.seekTo(ms)
     fun seekToIndex(index: Int) = _controller.value?.let { it.seekTo(index, 0); it.play() }

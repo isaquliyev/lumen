@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -33,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
@@ -69,7 +67,6 @@ import com.lumen.player.feature.focus.FocusViewModel
 import com.lumen.player.feature.focus.LocalFocusActions
 import com.lumen.player.feature.library.TrackMenuHost
 import com.lumen.player.feature.search.SearchScreen
-import com.lumen.player.feature.recap.RecapScreen
 import com.lumen.player.feature.playlist.AddSongsScreen
 import com.lumen.player.feature.playlist.AddToPlaylistHost
 import com.lumen.player.feature.playlist.PlaylistScreen
@@ -103,11 +100,13 @@ private enum class Tab(val label: String, val icon: ImageVector, val route: Any)
     ADD("Add", Icons.Rounded.Add, AddRoute),
 }
 
+// Home is the start destination: popping back to it also stores the popped screens
+// (like Settings) under Home, so restoring Home would bring them back. Home never restores
 fun NavHostController.openTab(route: Any) {
     navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
-        restoreState = true
+        restoreState = route != HomeRoute
     }
 }
 
@@ -164,7 +163,8 @@ fun AppShell(
             viewModel.events.consumeRoute()
         }
     }
-    BackHandler(enabled = expanded) { expanded = false }
+    // added each time the player opens, so it runs before the NavHost's own back handling
+    if (expanded) BackHandler { expanded = false }
 
     val navigator = remember(navController) {
         object : Navigator {
@@ -217,20 +217,20 @@ fun AppShell(
                 composable<PlaylistRoute> { PlaylistScreen() }
                 composable<SmartPlaylistRoute> { SmartPlaylistScreen() }
                 composable<AddSongsRoute> { AddSongsScreen() }
-                composable<RecapRoute> { RecapScreen() }
             }
             if (focused != null) FocusVignette(focused.accent, Modifier.fillMaxSize())
-            val currentEntry by navController.currentBackStackEntryAsState()
-            val fullScreen = currentEntry?.destination?.hasRoute(RecapRoute::class) == true
-            if (!fullScreen) Column(Modifier.align(Alignment.BottomCenter)) {
+            Column(Modifier.align(Alignment.BottomCenter)) {
                 nowPlaying?.let { track ->
                     MiniPlayer(track, player, onExpand = { expanded = true }, modifier = Modifier.padding(bottom = 8.dp))
                 }
                 BottomNav(navController)
             }
+            PlayerSheet(expanded, player, onCollapse = { expanded = false })
+            FocusSheet()
+            // drawn last so messages also show above the full-screen player
             SnackbarHost(
                 snackbars,
-                Modifier.align(Alignment.BottomCenter).padding(bottom = bottomSpace + 8.dp),
+                Modifier.align(Alignment.BottomCenter).padding(bottom = if (expanded) navInset + 16.dp else bottomSpace + 8.dp),
             ) { data ->
                 Snackbar(
                     data,
@@ -241,8 +241,6 @@ fun AppShell(
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
             }
-            PlayerSheet(expanded, player, onCollapse = { expanded = false })
-            FocusSheet()
         }
         }
         }
@@ -276,9 +274,7 @@ private fun BottomNav(navController: NavHostController, modifier: Modifier = Mod
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(tab.icon, contentDescription = tab.label, tint = color, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.height(3.dp))
-                    Box(Modifier.size(4.dp).clip(CircleShape).background(if (active) LumenColors.ember else LumenColors.ink))
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(4.dp))
                     Text(tab.label, style = LumenType.overline, color = color)
                 }
             }

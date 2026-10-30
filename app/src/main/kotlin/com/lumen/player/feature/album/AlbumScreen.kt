@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -36,6 +35,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.lumen.player.core.AppEvents
 import com.lumen.player.core.db.AlbumDao
 import com.lumen.player.core.db.AlbumRow
 import com.lumen.player.core.db.PlayContext
@@ -43,11 +43,11 @@ import com.lumen.player.core.db.TrackDao
 import com.lumen.player.core.db.TrackRow
 import com.lumen.player.core.design.CoverImage
 import com.lumen.player.core.design.GlowBackground
+import com.lumen.player.core.design.HideToggle
 import com.lumen.player.core.design.LocalAccent
 import com.lumen.player.core.design.LumenColors
 import com.lumen.player.core.design.LumenType
 import com.lumen.player.core.design.PillButton
-import com.lumen.player.core.design.PillStyle
 import com.lumen.player.core.design.Radii
 import com.lumen.player.core.design.Space
 import com.lumen.player.core.design.TrackRowItem
@@ -58,6 +58,7 @@ import com.lumen.player.core.util.formatCount
 import com.lumen.player.core.util.formatLength
 import com.lumen.player.core.util.seededTone
 import com.lumen.player.feature.library.LocalTrackMenu
+import com.lumen.player.feature.player.PlayModeButton
 import com.lumen.player.feature.shell.AlbumRoute
 import com.lumen.player.feature.shell.ArtistRoute
 import com.lumen.player.feature.shell.LocalBottomSpace
@@ -69,15 +70,26 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class AlbumState(val album: AlbumRow? = null, val songs: List<TrackRow> = emptyList())
 
 @HiltViewModel
-class AlbumViewModel @Inject constructor(handle: SavedStateHandle, albumDao: AlbumDao, trackDao: TrackDao) : ViewModel() {
+class AlbumViewModel @Inject constructor(
+    handle: SavedStateHandle,
+    private val albumDao: AlbumDao,
+    trackDao: TrackDao,
+    private val events: AppEvents,
+) : ViewModel() {
     val id = handle.toRoute<AlbumRoute>().id
     val state: StateFlow<AlbumState> = combine(albumDao.observe(id), trackDao.observeByAlbum(id)) { album, songs -> AlbumState(album, songs) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AlbumState())
+
+    fun setHideSongs(hide: Boolean) = viewModelScope.launch {
+        albumDao.setHideSongs(id, hide)
+        events.show(if (hide) "Songs hidden from Library" else "Songs shown in Library")
+    }
 }
 
 @Composable
@@ -86,6 +98,7 @@ fun AlbumScreen(viewModel: AlbumViewModel = hiltViewModel()) {
     val album = state.album ?: return
     val songs = state.songs
     val player = LocalPlayer.current
+    val shuffleOn by player.shuffleMode.collectAsStateWithLifecycle()
     val nav = LocalNav.current
     val menu = LocalTrackMenu.current
     val coverTrack = songs.firstOrNull { it.id == album.coverTrackId } ?: songs.firstOrNull()
@@ -119,16 +132,16 @@ fun AlbumScreen(viewModel: AlbumViewModel = hiltViewModel()) {
                         color = LumenColors.paper2,
                     )
                     Spacer(Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PillButton("Play", { player.play(songs, 0, PlayContext.ALBUM, album.id, album.title) }, icon = Icons.Rounded.PlayArrow, modifier = Modifier.testTag("album_play"))
-                        PillButton("Shuffle", { player.play(songs, -1, PlayContext.ALBUM, album.id, album.title, shuffle = true) },
-                            style = PillStyle.OUTLINED, icon = Icons.Rounded.Shuffle, modifier = Modifier.testTag("album_shuffle"))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        PillButton("Play", { player.play(songs, -1, PlayContext.ALBUM, album.id, album.title, shuffle = shuffleOn) }, icon = Icons.Rounded.PlayArrow, modifier = Modifier.testTag("album_play"))
+                        PlayModeButton(PlayContext.ALBUM, album.id)
+                        HideToggle(album.hideSongs, { viewModel.setHideSongs(!album.hideSongs) })
                     }
                     Spacer(Modifier.height(12.dp))
                 }
             }
             itemsIndexed(songs, key = { _, it -> it.id }) { index, track ->
-                TrackRowItem(track, onClick = { player.play(songs, index, PlayContext.ALBUM, album.id, album.title) }, onMore = { menu.open(track) })
+                TrackRowItem(track, onClick = { player.play(songs, index, PlayContext.ALBUM, album.id, album.title, shuffle = shuffleOn) }, onMore = { menu.open(track) })
             }
         }
     }

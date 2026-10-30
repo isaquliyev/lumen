@@ -39,6 +39,7 @@ import com.lumen.player.core.design.SegmentedTabs
 import com.lumen.player.core.design.Space
 import com.lumen.player.core.util.formatBytes
 import com.lumen.player.data.StorageMode
+import com.lumen.player.data.ThemeMode
 import com.lumen.player.feature.library.ConfirmDialog
 import com.lumen.player.feature.pulse.HowItsCounted
 import com.lumen.player.feature.shell.LocalBottomSpace
@@ -116,18 +117,12 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         }
 
         item { SettingsSection("Playback") }
-        item { SwitchRow("Volume normalisation", "Plays loud songs a little quieter, never louder.", settings.normalize, "settings_normalize") { viewModel.setNormalize(it) } }
+        item { SwitchRow("Volume normalisation", "Makes loud songs quieter and quiet songs louder, so all songs play at a similar volume.", settings.normalize, "settings_normalize") { viewModel.setNormalize(it) } }
+        item { SwitchRow("Stereo audio", "Off = mono: the same sound in both ears.", settings.stereo, "settings_stereo") { viewModel.setStereo(it) } }
         item { SwitchRow("Resume on launch", "Bring back the last queue, paused.", settings.resumeOnLaunch, "settings_resume") { viewModel.setResumeOnLaunch(it) } }
 
         item { SettingsSection("Downloads") }
         item { SwitchRow("Wi-Fi only", "Wait for Wi-Fi before downloading.", settings.wifiOnly, "settings_wifi") { viewModel.setWifiOnly(it) } }
-        item {
-            Row(Modifier.fillMaxWidth().padding(horizontal = Space.side, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Parallel downloads", style = LumenType.body, color = LumenColors.paper, modifier = Modifier.weight(1f))
-                SegmentedTabs(listOf("1", "2", "3"), settings.parallelDownloads - 1, { viewModel.setParallel(it + 1) })
-            }
-        }
-        item { SwitchRow("Prefer m4a", "Off = best available audio (may be webm).", settings.preferM4a, "settings_m4a") { viewModel.setPreferM4a(it) } }
         item { InfoRow("Update downloader", "yt-dlp ${version ?: "…"}", tag = "settings_ytdlp", onClick = { viewModel.updateYtDlp() }) }
 
         item { SettingsSection("Listening data") }
@@ -136,19 +131,17 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
 
         item { SettingsSection("Appearance") }
         item {
+            Row(Modifier.fillMaxWidth().padding(horizontal = Space.side, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Theme", style = LumenType.body, color = LumenColors.paper, modifier = Modifier.weight(1f))
+                SegmentedTabs(listOf("System", "Light", "Dark"), settings.theme.ordinal, { viewModel.setTheme(ThemeMode.entries[it]) })
+            }
+        }
+        item {
             SwitchRow("Reduce motion", "Turns off ambient and staggered animations.", settings.reduceMotion, "settings_reduce_motion") {
                 viewModel.setReduceMotion(it)
             }
         }
 
-        item { SettingsSection("About") }
-        item {
-            InfoRow(
-                "Lumen ${BuildConfig.VERSION_NAME}",
-                "Personal use only. Fonts: Fraunces and Manrope (SIL Open Font License). Libraries: AndroidX, Media3, Room, " +
-                    "Hilt, OkHttp, Coil, kotlinx (Apache 2.0); youtubedl-android (GPL-3.0); yt-dlp (Unlicense); reorderable (Apache 2.0).",
-            )
-        }
         if (BuildConfig.DEBUG) {
             item { SettingsSection("Debug") }
             item { InfoRow("Seed 1,500 fake songs", tag = "debug_seed_songs", onClick = { viewModel.seedSongs() }) }

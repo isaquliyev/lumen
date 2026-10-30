@@ -26,6 +26,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
@@ -33,9 +35,7 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
@@ -44,11 +44,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,7 +70,6 @@ import com.lumen.player.core.design.EmptyState
 import com.lumen.player.core.design.LocalAccent
 import com.lumen.player.core.design.LumenColors
 import com.lumen.player.core.design.LumenType
-import com.lumen.player.core.design.PillButton
 import com.lumen.player.core.design.PillStyle
 import com.lumen.player.core.design.Radii
 import com.lumen.player.core.design.ScreenTitle
@@ -84,6 +83,7 @@ import com.lumen.player.core.util.formatCount
 import com.lumen.player.core.util.formatLength
 import com.lumen.player.feature.focus.FocusPill
 import com.lumen.player.feature.focus.LocalFocusActions
+import com.lumen.player.feature.player.PlayModeButton
 import com.lumen.player.feature.playlist.PlaylistsTab
 import com.lumen.player.feature.shell.AddRoute
 import com.lumen.player.feature.shell.AlbumRoute
@@ -97,10 +97,17 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun LibraryScreen(viewModel: LibraryViewModel = hiltViewModel()) {
-    var tab by rememberSaveable { mutableStateOf(0) }
+    val savedTab by viewModel.libraryTab.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
     val nav = LocalNav.current
     BackHandler(enabled = selection.isNotEmpty()) { viewModel.clearSelection() }
+    val startTab = savedTab ?: return
+    val pagerState = rememberPagerState(initialPage = startTab) { 4 }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(pagerState.settledPage) {
+        viewModel.clearSelection()
+        viewModel.setLibraryTab(pagerState.settledPage)
+    }
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.statusBarsPadding().padding(top = 16.dp)) {
@@ -112,14 +119,20 @@ fun LibraryScreen(viewModel: LibraryViewModel = hiltViewModel()) {
             }
             FocusPill(Modifier.padding(start = Space.side, top = 4.dp))
             Spacer(Modifier.height(12.dp))
-            SegmentedTabs(listOf("Songs", "Playlists", "Artists", "Albums"), tab, { tab = it; viewModel.clearSelection() })
+            SegmentedTabs(
+                listOf("Playlists", "Songs", "Artists", "Albums"),
+                pagerState.currentPage,
+                { scope.launch { pagerState.animateScrollToPage(it) } },
+            )
             Spacer(Modifier.height(8.dp))
         }
-        when (tab) {
-            0 -> SongsTab(viewModel)
-            1 -> PlaylistsTab()
-            2 -> ArtistsTab(viewModel)
-            else -> AlbumsTab(viewModel)
+        HorizontalPager(pagerState, Modifier.fillMaxSize(), key = { it }) { page ->
+            when (page) {
+                0 -> PlaylistsTab()
+                1 -> SongsTab(viewModel)
+                2 -> ArtistsTab(viewModel)
+                else -> AlbumsTab(viewModel)
+            }
         }
     }
 }
@@ -130,6 +143,7 @@ private fun SongsTab(viewModel: LibraryViewModel) {
     val sort by viewModel.songSort.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
     val player = LocalPlayer.current
+    val shuffleOn by player.shuffleMode.collectAsStateWithLifecycle()
     val menu = LocalTrackMenu.current
     val nav = LocalNav.current
     val addToPlaylist = LocalAddToPlaylist.current
@@ -162,14 +176,10 @@ private fun SongsTab(viewModel: LibraryViewModel) {
                         )
                         Spacer(Modifier.height(12.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            PillButton("Shuffle", { player.play(songs, -1, PlayContext.ALL_SONGS, null, "All songs", shuffle = true) },
-                                icon = Icons.Rounded.Shuffle, modifier = Modifier.testTag("songs_shuffle"))
-                            Spacer(Modifier.width(8.dp))
-                            PillButton("Play", { player.play(songs, 0, PlayContext.ALL_SONGS, null, "All songs") },
-                                style = PillStyle.OUTLINED, icon = Icons.Rounded.PlayArrow, modifier = Modifier.testTag("songs_play"))
+                            PlayModeButton(PlayContext.ALL_SONGS, null, activeStyle = PillStyle.FILLED)
                             Spacer(Modifier.width(8.dp))
                             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                                SortChip(SongSort.entries, sort, { it.label }, { viewModel.songSort.value = it; scope.launch { listState.scrollToItem(0) } })
+                                SortChip(SongSort.entries, sort, { it.label }, { viewModel.setSongSort(it); scope.launch { listState.scrollToItem(0) } })
                             }
                         }
                     }
@@ -196,7 +206,7 @@ private fun SongsTab(viewModel: LibraryViewModel) {
                     track,
                     onClick = {
                         if (selecting) viewModel.toggleSelected(track.id)
-                        else player.play(songs, index, PlayContext.ALL_SONGS, null, "All songs")
+                        else player.play(songs, index, PlayContext.ALL_SONGS, null, "All songs", shuffle = shuffleOn)
                     },
                     onLongClick = { viewModel.toggleSelected(track.id) },
                     onMore = if (selecting) null else ({ menu.open(track) }),
@@ -276,7 +286,7 @@ private fun ArtistsTab(viewModel: LibraryViewModel) {
         item(span = { GridItemSpan(3) }) {
             Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(formatCount(artists.size, "artist"), style = LumenType.label, color = LumenColors.paper2, modifier = Modifier.weight(1f))
-                SortChip(ArtistSort.entries, sort, { it.label }, { viewModel.artistSort.value = it })
+                SortChip(ArtistSort.entries, sort, { it.label }, { viewModel.setArtistSort(it) })
             }
         }
         items(artists, key = { it.id }) { artist ->

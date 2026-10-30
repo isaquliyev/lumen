@@ -22,6 +22,14 @@ interface StatsDao {
     )
     fun topTracks(from: Long, to: Long, limit: Int, focusOff: Boolean, focusIds: List<String>): Flow<List<TrackPlays>>
 
+    // Pulse ranks songs by total listening time, not by number of plays
+    @Query(
+        "SELECT pe.track_id AS trackId, SUM(pe.listened_ms >= 30000) AS plays, SUM(pe.listened_ms) AS listenedMs " +
+            "FROM play_events pe WHERE $EVENT_RANGE AND $EVENT_FOCUS GROUP BY pe.track_id HAVING plays > 0 " +
+            "ORDER BY listenedMs DESC LIMIT :limit"
+    )
+    fun topTracksByTime(from: Long, to: Long, limit: Int, focusOff: Boolean, focusIds: List<String>): Flow<List<TrackPlays>>
+
     @Query(
         "SELECT ta.artist_id AS artistId, SUM(pe.listened_ms) AS listenedMs, SUM(pe.listened_ms >= 30000) AS plays " +
             "FROM play_events pe JOIN track_artists ta ON ta.track_id = pe.track_id " +

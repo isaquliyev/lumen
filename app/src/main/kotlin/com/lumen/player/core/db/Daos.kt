@@ -10,8 +10,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TrackDao {
-    @Query("SELECT $TRACK_ROW $TRACK_FROM WHERE t.deleted_at IS NULL AND $FOCUS_FILTER")
-    fun observeSongs(focusOff: Boolean, focusIds: List<String>): Flow<List<TrackRow>>
+    @Query("SELECT $TRACK_ROW $TRACK_FROM WHERE t.deleted_at IS NULL AND $FOCUS_FILTER AND (:includeHidden OR $NOT_HIDDEN)")
+    fun observeSongs(focusOff: Boolean, focusIds: List<String>, includeHidden: Boolean): Flow<List<TrackRow>>
 
     @Query("SELECT $TRACK_ROW $TRACK_FROM WHERE t.deleted_at IS NULL AND t.liked_at IS NOT NULL ORDER BY t.liked_at DESC")
     fun observeLiked(): Flow<List<TrackRow>>
@@ -79,6 +79,12 @@ interface TrackDao {
     @Query("SELECT * FROM tracks WHERE deleted_at IS NULL")
     suspend fun allActive(): List<TrackEntity>
 
+    @Query("SELECT * FROM tracks WHERE deleted_at IS NULL AND gain_db = 0")
+    suspend fun withZeroGain(): List<TrackEntity>
+
+    @Query("UPDATE tracks SET gain_db = :gainDb WHERE id = :id")
+    suspend fun setGain(id: String, gainDb: Float)
+
     @Query("SELECT COUNT(*) FROM tracks WHERE deleted_at IS NULL")
     suspend fun count(): Int
 
@@ -111,6 +117,12 @@ interface TrackArtistDao {
 
     @Query("DELETE FROM track_artists WHERE track_id LIKE 'seed%'")
     suspend fun deleteSeeded()
+
+    @Query("UPDATE OR IGNORE track_artists SET artist_id = :to WHERE artist_id = :from")
+    suspend fun moveArtist(from: String, to: String)
+
+    @Query("DELETE FROM track_artists WHERE artist_id = :artistId")
+    suspend fun deleteForArtist(artistId: String)
 }
 
 @Dao
@@ -118,7 +130,7 @@ interface ArtistDao {
     @Query(
         "SELECT a.id AS id, a.name AS name, a.sort_name AS sortName, a.has_image AS hasImage, a.tone_hue AS toneHue, " +
             "a.tone_sat AS toneSat, COUNT(t.id) AS trackCount FROM artists a " +
-            "JOIN track_artists ta ON ta.artist_id = a.id JOIN tracks t ON t.id = ta.track_id AND t.deleted_at IS NULL " +
+            "JOIN track_artists ta ON ta.artist_id = a.id JOIN tracks t ON t.id = ta.track_id AND t.deleted_at IS NULL AND $NOT_IN_HIDDEN_PLAYLIST " +
             "GROUP BY a.id ORDER BY a.sort_name"
     )
     fun observeAll(): Flow<List<ArtistRow>>
@@ -140,24 +152,33 @@ interface ArtistDao {
 
     @Query("DELETE FROM artists WHERE id LIKE 'seed%'")
     suspend fun deleteSeeded()
+
+    @Query("SELECT * FROM artists")
+    suspend fun all(): List<ArtistEntity>
+
+    @Query("DELETE FROM artists WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("UPDATE artists SET hide_songs = :hide WHERE id = :id")
+    suspend fun setHideSongs(id: String, hide: Boolean)
 }
 
 @Dao
 interface AlbumDao {
     @Query(
         "SELECT al.id AS id, al.title AS title, al.artist_id AS artistId, a.name AS artistName, " +
-            "al.release_date AS releaseDate, al.genre AS genre, " +
+            "al.release_date AS releaseDate, al.genre AS genre, al.hide_songs AS hideSongs, " +
             "COALESCE(MIN(CASE WHEN t.id = al.cover_track_id THEN t.id END), MIN(CASE WHEN t.has_cover THEN t.id END)) AS coverTrackId, " +
             "COUNT(t.id) AS trackCount, COALESCE(SUM(t.duration_ms), 0) AS durationMs " +
             "FROM albums al LEFT JOIN artists a ON a.id = al.artist_id " +
-            "JOIN tracks t ON t.album_id = al.id AND t.deleted_at IS NULL AND $FOCUS_FILTER " +
+            "JOIN tracks t ON t.album_id = al.id AND t.deleted_at IS NULL AND $FOCUS_FILTER AND $NOT_IN_HIDDEN_PLAYLIST " +
             "GROUP BY al.id ORDER BY al.title"
     )
     fun observeAll(focusOff: Boolean, focusIds: List<String>): Flow<List<AlbumRow>>
 
     @Query(
         "SELECT al.id AS id, al.title AS title, al.artist_id AS artistId, a.name AS artistName, " +
-            "al.release_date AS releaseDate, al.genre AS genre, " +
+            "al.release_date AS releaseDate, al.genre AS genre, al.hide_songs AS hideSongs, " +
             "COALESCE(MIN(CASE WHEN t.id = al.cover_track_id THEN t.id END), MIN(CASE WHEN t.has_cover THEN t.id END)) AS coverTrackId, " +
             "COUNT(t.id) AS trackCount, COALESCE(SUM(t.duration_ms), 0) AS durationMs " +
             "FROM albums al LEFT JOIN artists a ON a.id = al.artist_id " +
@@ -176,6 +197,12 @@ interface AlbumDao {
 
     @Query("DELETE FROM albums WHERE id LIKE 'seed%'")
     suspend fun deleteSeeded()
+
+    @Query("UPDATE albums SET artist_id = :to WHERE artist_id = :from")
+    suspend fun moveArtist(from: String, to: String)
+
+    @Query("UPDATE albums SET hide_songs = :hide WHERE id = :id")
+    suspend fun setHideSongs(id: String, hide: Boolean)
 }
 
 @Dao
@@ -222,6 +249,9 @@ interface PlaylistDao {
 
     @Query("UPDATE playlists SET pinned = :pinned WHERE id = :id")
     suspend fun setPinned(id: String, pinned: Boolean)
+
+    @Query("UPDATE playlists SET hide_songs = :hide WHERE id = :id")
+    suspend fun setHideSongs(id: String, hide: Boolean)
 
     @Query("UPDATE playlists SET has_custom_cover = :value, updated_at = :now WHERE id = :id")
     suspend fun setCustomCover(id: String, value: Boolean, now: Long)
@@ -337,12 +367,15 @@ interface DownloadJobDao {
     @Query("UPDATE download_jobs SET title = :title, artist = :artist, cover_url = COALESCE(:coverUrl, cover_url) WHERE id = :id")
     suspend fun setInfo(id: String, title: String, artist: String, coverUrl: String?)
 
-    @Query("SELECT deezer_id FROM tracks WHERE deleted_at IS NULL AND deezer_id IS NOT NULL")
-    fun observeLibraryDeezerIds(): Flow<List<Long>>
+    @Query("SELECT deezer_id AS deezerId, id AS trackId FROM tracks WHERE deleted_at IS NULL AND deezer_id IS NOT NULL")
+    fun observeLibraryDeezerLinks(): Flow<List<DeezerLink>>
 
     @Query("UPDATE download_jobs SET status = 'RUNNING', updated_at = :now WHERE id = :id AND status = 'QUEUED'")
     suspend fun claim(id: String, now: Long): Int
 
     @Query("DELETE FROM download_jobs WHERE status IN ('DONE', 'FAILED', 'CANCELLED')")
     suspend fun deleteFinished()
+
+    @Query("DELETE FROM download_jobs WHERE id = :id")
+    suspend fun delete(id: String)
 }

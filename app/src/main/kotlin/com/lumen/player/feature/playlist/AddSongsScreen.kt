@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -54,6 +53,7 @@ import com.lumen.player.data.FocusRepository
 import com.lumen.player.data.PlaylistRepository
 import com.lumen.player.data.TrackRepository
 import com.lumen.player.feature.shell.AddSongsRoute
+import com.lumen.player.feature.shell.LocalBottomSpace
 import com.lumen.player.feature.shell.LocalNav
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -172,7 +172,7 @@ fun AddSongsScreen(viewModel: AddSongsViewModel = hiltViewModel()) {
         PillButton(
             if (selected.isEmpty()) "Pick songs" else "Add ${selected.size} ${if (selected.size == 1) "song" else "songs"}",
             { viewModel.add { nav.back() } },
-            Modifier.padding(Space.side).fillMaxWidth().navigationBarsPadding().testTag("picker_add"),
+            Modifier.padding(Space.side).padding(bottom = LocalBottomSpace.current).fillMaxWidth().testTag("picker_add"),
             enabled = selected.isNotEmpty(),
         )
     }

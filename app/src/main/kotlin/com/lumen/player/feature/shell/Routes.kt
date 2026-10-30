@@ -14,7 +14,6 @@ import kotlinx.serialization.Serializable
 @Serializable data class PlaylistRoute(val id: String)
 @Serializable data class SmartPlaylistRoute(val kind: String)
 @Serializable data class AddSongsRoute(val playlistId: String)
-@Serializable data class RecapRoute(val year: Int, val month: Int)
 @Serializable object LyricsRoute
 
 interface Navigator {

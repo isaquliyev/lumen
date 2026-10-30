@@ -197,7 +197,7 @@ private fun FolderTree() {
         "  lyrics/" to "synced lyrics",
         "  playlists/" to "playlist covers",
         "  data/" to "library backup",
-        "  exports/" to "shared recaps",
+        "  exports/" to "exported logs",
     )
     Column(
         Modifier

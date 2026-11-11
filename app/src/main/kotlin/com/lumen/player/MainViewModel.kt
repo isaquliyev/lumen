@@ -30,8 +30,6 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
 
     fun openPlayer() = events.openPlayer()
-
-    fun openRecap(year: Int, month: Int) = events.openRoute(com.lumen.player.feature.shell.RecapRoute(year, month))
     val settings: StateFlow<Settings?> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
@@ -40,9 +38,15 @@ class MainViewModel @Inject constructor(
             repository.settings.first { it.onboardingDone }
             snapshots.get().start()
             player.get().connect()
-            com.lumen.player.feature.recap.RecapWorker.schedule(context)
+            // the monthly recap was removed: stop its old daily job and notification channel
+            androidx.work.WorkManager.getInstance(context).cancelUniqueWork("recap-check")
+            context.getSystemService(android.app.NotificationManager::class.java).deleteNotificationChannel("recaps")
             queue.get().resumeAfterStart()
         }
+    }
+
+    override fun onCleared() {
+        player.get().release()
     }
 
     fun handleShared(text: String) {

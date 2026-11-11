@@ -8,6 +8,8 @@ import com.lumen.player.core.db.LumenDatabase
 import com.lumen.player.core.db.TrackEntity
 import com.lumen.player.core.storage.LumenPaths
 import com.lumen.player.core.storage.SnapshotManager
+import com.lumen.player.core.util.normalize
+import com.lumen.player.download.analyseAudio
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -59,6 +61,31 @@ class LibraryMaintenance @Inject constructor(
     suspend fun fix(result: CheckResult) = withContext(Dispatchers.IO) {
         tracks.delete(result.missing.map { it.id })
         result.orphans.forEach { it.delete() }
+    }
+
+    // songs saved with gain 0 were capped by the old "never louder" rule; measure them again
+    suspend fun reanalyseQuietSongs() = withContext(Dispatchers.IO) {
+        db.trackDao().withZeroGain().filter { !it.id.startsWith("seed") }.forEach { track ->
+            val file = paths.resolve(track.audioFile)
+            if (file.exists()) runCatching { analyseAudio(file) }.onSuccess { db.trackDao().setGain(track.id, it.gainDb) }
+        }
+    }
+
+    // songs added from a YouTube link without a Deezer match got a name-only artist ("nm…");
+    // when a Deezer artist has the same name, its songs and albums move there and the copy goes
+    suspend fun mergeDuplicateArtists() = withContext(Dispatchers.IO) {
+        val artists = db.artistDao().all()
+        val deezer = artists.filter { it.deezerId != null }.associateBy { normalize(it.name) }
+        val pairs = artists.filter { it.id.startsWith("nm") }.mapNotNull { copy -> deezer[normalize(copy.name)]?.let { copy.id to it.id } }
+        if (pairs.isEmpty()) return@withContext
+        db.withTransaction {
+            pairs.forEach { (from, to) ->
+                db.trackArtistDao().moveArtist(from, to)
+                db.trackArtistDao().deleteForArtist(from)
+                db.albumDao().moveArtist(from, to)
+                db.artistDao().delete(from)
+            }
+        }
     }
 
     suspend fun resetStatistics() = withContext(Dispatchers.IO) { db.withTransaction { db.playEventDao().deleteAll() } }

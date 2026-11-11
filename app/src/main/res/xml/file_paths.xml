@@ -2,4 +2,5 @@
 <paths>
     <external-path name="lumen" path="Lumen/exports/" />
     <external-files-path name="private" path="Lumen/exports/" />
+    <cache-path name="share" path="share/" />
 </paths>

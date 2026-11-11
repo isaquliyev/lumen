@@ -16,14 +16,11 @@ import com.lumen.player.core.db.DownloadJobEntity
 import com.lumen.player.core.db.JobStatus
 import com.lumen.player.core.net.isOffline
 import com.lumen.player.core.storage.LumenPaths
-import com.lumen.player.data.SettingsRepository
 import com.lumen.player.download.sources.YtDlpManager
 import com.yausername.youtubedl_android.YoutubeDL
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
 const val DOWNLOAD_CHANNEL = "downloads"
@@ -41,7 +38,6 @@ class DownloadWorker @AssistedInject constructor(
     private val queue: DownloadQueue,
     private val pipeline: DownloadPipeline,
     private val dao: DownloadJobDao,
-    private val settings: SettingsRepository,
     private val paths: LumenPaths,
 ) : CoroutineWorker(context, params) {
 
@@ -63,23 +59,18 @@ class DownloadWorker @AssistedInject constructor(
 
     private suspend fun refreshNotification() {
         val current = running.values.firstOrNull() ?: return
-        val more = if (running.size > 1) " (+${running.size - 1})" else ""
+        val waiting = dao.activeCount() - 1
+        val more = if (waiting > 0) " (+$waiting waiting)" else ""
         runCatching { setForeground(foregroundInfo("${current.first}$more", current.second)) }
     }
 
     override suspend fun doWork(): Result {
         createDownloadChannel(applicationContext)
         runCatching { setForeground(getForegroundInfo()) }
-        val parallel = settings.current().parallelDownloads.coerceIn(1, 3)
-        coroutineScope {
-            repeat(parallel) {
-                launch {
-                    while (true) {
-                        val job = queue.claimNext() ?: break
-                        runJob(job)
-                    }
-                }
-            }
+        // one song at a time, oldest first; songs added meanwhile wait in the queue
+        while (true) {
+            val job = queue.claimNext() ?: break
+            runJob(job)
         }
         return Result.success()
     }

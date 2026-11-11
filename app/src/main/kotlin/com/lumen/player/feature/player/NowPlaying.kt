@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
@@ -93,7 +94,7 @@ import com.lumen.player.core.design.LocalReduceMotion
 import com.lumen.player.core.design.LumenColors
 import com.lumen.player.core.design.LumenType
 import com.lumen.player.core.design.Radii
-import com.lumen.player.core.design.WaveformScrubber
+import com.lumen.player.core.design.ProgressScrubber
 import com.lumen.player.core.design.sheetSpring
 import com.lumen.player.core.util.activeLineIndex
 import com.lumen.player.core.util.formatClock
@@ -149,7 +150,6 @@ fun NowPlaying(track: TrackRow, viewModel: PlayerViewModel, onCollapse: () -> Un
     val repeat by viewModel.repeatMode.collectAsStateWithLifecycle()
     val shuffle by viewModel.shuffle.collectAsStateWithLifecycle()
     val context by viewModel.context.collectAsStateWithLifecycle()
-    val waveform by viewModel.waveform.collectAsStateWithLifecycle()
     val lyrics by viewModel.lyrics.collectAsStateWithLifecycle()
     val artists by viewModel.artists.collectAsStateWithLifecycle()
     val sleep by viewModel.sleep.collectAsStateWithLifecycle()
@@ -159,6 +159,7 @@ fun NowPlaying(track: TrackRow, viewModel: PlayerViewModel, onCollapse: () -> Un
     var lyricsOpen by remember { mutableStateOf(false) }
     var queueOpen by remember { mutableStateOf(false) }
     var sleepOpen by remember { mutableStateOf(false) }
+    var shareOpen by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     val menu = LocalTrackMenu.current
     val addToPlaylist = LocalAddToPlaylist.current
@@ -174,6 +175,9 @@ fun NowPlaying(track: TrackRow, viewModel: PlayerViewModel, onCollapse: () -> Un
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("PLAYING FROM", style = LumenType.overline, color = LumenColors.paper3)
                         Text(context.name, style = LumenType.label, color = LumenColors.paper, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    IconButton(onClick = { shareOpen = true }, modifier = Modifier.testTag("player_share")) {
+                        Icon(Icons.Rounded.Share, "Share to Instagram Story", tint = LumenColors.paper)
                     }
                     IconButton(onClick = { menu.open(track) }, modifier = Modifier.testTag("player_menu")) {
                         Icon(Icons.Rounded.MoreHoriz, "More", tint = LumenColors.paper)
@@ -203,8 +207,7 @@ fun NowPlaying(track: TrackRow, viewModel: PlayerViewModel, onCollapse: () -> Un
                 }
                 Spacer(Modifier.height(18.dp))
                 val progress = if (duration > 0) position.toFloat() / duration else 0f
-                WaveformScrubber(
-                    waveform,
+                ProgressScrubber(
                     progress,
                     onSeek = { viewModel.connection.seekTo((it * duration).toLong()) },
                     onDragging = { scrubbing = it },
@@ -221,7 +224,7 @@ fun NowPlaying(track: TrackRow, viewModel: PlayerViewModel, onCollapse: () -> Un
                 LyricsPeek(lyrics?.parsed?.lines, hasSynced, position + track.lyricsOffsetMs, lyrics?.kind) { lyricsOpen = true }
                 Spacer(Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceAround) {
-                    BottomAction(Icons.Rounded.Lyrics, "Lyrics", "player_lyrics") { lyricsOpen = true }
+                    if (hasSynced) BottomAction(Icons.Rounded.Lyrics, "Lyrics", "player_lyrics") { lyricsOpen = true }
                     BottomAction(Icons.AutoMirrored.Rounded.QueueMusic, "Queue", "player_queue") { queueOpen = true }
                     BottomAction(Icons.Rounded.Bedtime, sleepLabel(sleep), "player_sleep", active = sleep != SleepState.Off) { sleepOpen = true }
                     BottomAction(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add", "player_add") { addToPlaylist(listOf(track.id)) }
@@ -237,6 +240,10 @@ fun NowPlaying(track: TrackRow, viewModel: PlayerViewModel, onCollapse: () -> Un
         }
         if (queueOpen) QueueSheet(viewModel, onDismiss = { queueOpen = false })
         if (sleepOpen) SleepSheet(viewModel, sleep, onDismiss = { sleepOpen = false })
+        if (shareOpen) {
+            val lines = if (hasSynced) lyrics?.parsed?.lines.orEmpty().map { it.text.trim() }.filter { it.isNotEmpty() }.distinct() else emptyList()
+            StoryShareSheet(track, lines, onDismiss = { shareOpen = false })
+        }
     }
 }
 

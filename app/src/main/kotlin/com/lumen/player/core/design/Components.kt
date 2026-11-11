@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +33,29 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 enum class PillStyle { FILLED, OUTLINED, EMBER }
+
+// open eye: the songs are in the Library; crossed eye in the accent colour: they are kept out of it
+@Composable
+fun HideToggle(hidden: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val accent = LocalAccent.current.accent
+    Box(
+        modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(if (hidden) accent.copy(alpha = 0.14f) else Color.Transparent)
+            .then(if (hidden) Modifier else Modifier.border(BorderStroke(1.dp, LumenColors.line), CircleShape))
+            .clickable(onClick = onClick)
+            .testTag("hide_toggle"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (hidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+            if (hidden) "Show songs in Library" else "Keep songs out of Library",
+            tint = if (hidden) accent else LumenColors.paper,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
 
 @Composable
 fun PillButton(

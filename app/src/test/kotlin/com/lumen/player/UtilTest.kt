@@ -13,6 +13,7 @@ import com.lumen.player.core.util.splitCredits
 import com.lumen.player.download.LinkKind
 import com.lumen.player.download.classifyLink
 import com.lumen.player.download.firstUrl
+import com.lumen.player.download.youtubeVideoId
 import com.lumen.player.download.sources.spotifyArtistFromPage
 import com.lumen.player.download.sources.spotifyTrackId
 import org.junit.Assert.assertEquals
@@ -69,6 +70,21 @@ class UtilTest {
         assertEquals(LinkKind.YOUTUBE, classifyLink("https://music.youtube.com/watch?v=dQw4w9WgXcQ"))
         assertNull(classifyLink("https://example.com/song"))
         assertEquals("https://youtu.be/x", firstUrl("listen to this https://youtu.be/x."))
+    }
+
+    @Test
+    fun youtubeVideoIds() {
+        val id = "dQw4w9WgXcQ"
+        assertEquals(id, youtubeVideoId("https://youtu.be/$id?si=abc123"))
+        assertEquals(id, youtubeVideoId("https://www.youtube.com/watch?v=$id&t=42s"))
+        assertEquals(id, youtubeVideoId("https://m.youtube.com/watch?feature=share&v=$id"))
+        assertEquals(id, youtubeVideoId("https://music.youtube.com/watch?v=$id&list=RD"))
+        assertEquals(id, youtubeVideoId("https://youtube.com/shorts/$id?feature=share"))
+        assertEquals(id, youtubeVideoId("  check https://www.youtube.com/embed/$id  "))
+        assertEquals(id, youtubeVideoId("https://www.youtube.com/live/$id"))
+        assertNull(youtubeVideoId("https://www.youtube.com/playlist?list=PL123"))
+        assertNull(youtubeVideoId("https://open.spotify.com/track/$id"))
+        assertNull(youtubeVideoId("not a link"))
     }
 
     @Test

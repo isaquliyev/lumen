@@ -24,6 +24,23 @@ const val FOCUS_FILTER = """
     (:focusOff OR EXISTS (SELECT 1 FROM track_artists fa WHERE fa.track_id = t.id AND fa.artist_id IN (:focusIds)))
 """
 
+// songs in a playlist with "Keep songs out of Library" on
+const val NOT_IN_HIDDEN_PLAYLIST = """
+    NOT EXISTS (SELECT 1 FROM playlist_tracks hp JOIN playlists hpl ON hpl.id = hp.playlist_id
+        WHERE hp.track_id = t.id AND hpl.hide_songs = 1)
+"""
+
+// the song lists also leave out songs of artists and albums with the switch on; the Artists and
+// Albums tabs do not use this, so those pages stay reachable and the switch can be turned off
+const val NOT_HIDDEN = """
+    $NOT_IN_HIDDEN_PLAYLIST
+    AND NOT EXISTS (SELECT 1 FROM track_artists hta JOIN artists har ON har.id = hta.artist_id
+        WHERE hta.track_id = t.id AND har.hide_songs = 1)
+    AND NOT EXISTS (SELECT 1 FROM albums hal WHERE hal.id = t.album_id AND hal.hide_songs = 1)
+"""
+
+data class DeezerLink(val deezerId: Long, val trackId: String)
+
 @Immutable
 data class TrackRow(
     val id: String,
@@ -75,6 +92,7 @@ data class AlbumRow(
     val coverTrackId: String?,
     val trackCount: Int,
     val durationMs: Long,
+    val hideSongs: Boolean = false,
 )
 
 @Immutable

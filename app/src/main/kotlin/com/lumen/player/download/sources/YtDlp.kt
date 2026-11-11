@@ -138,10 +138,10 @@ class YtDlpAudio @Inject constructor(private val manager: YtDlpManager) {
         YtDlpParse.video(YoutubeDL.getInstance().execute(request).out)
     }
 
-    suspend fun download(videoId: String, workDir: File, trackId: String, jobId: String, preferM4a: Boolean, onProgress: (Int) -> Unit): File = run {
+    suspend fun download(videoId: String, workDir: File, trackId: String, jobId: String, onProgress: (Int) -> Unit): File = run {
         workDir.mkdirs()
         val request = YoutubeDLRequest("https://www.youtube.com/watch?v=$videoId").apply {
-            addOption("-f", if (preferM4a) "bestaudio[ext=m4a]/bestaudio" else "bestaudio")
+            addOption("-f", "bestaudio[ext=m4a]/bestaudio")
             addOption("--no-playlist")
             addOption("--no-mtime")
             addOption("--no-part")

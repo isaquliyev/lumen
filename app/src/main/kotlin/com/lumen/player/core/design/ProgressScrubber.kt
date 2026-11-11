@@ -20,10 +20,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
-// 96 bars from the analysed waveform; played bars in the accent, drag or tap to seek
+// plain progress bar; played part in the accent, drag or tap to seek
 @Composable
-fun WaveformScrubber(
-    waveform: ByteArray?,
+fun ProgressScrubber(
     progress: Float,
     onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier,
@@ -32,18 +31,14 @@ fun WaveformScrubber(
     val accent = LocalAccent.current.accent
     val haptics = LocalHapticFeedback.current
     var drag by remember { mutableStateOf<Float?>(null) }
-    val bars = remember(waveform) {
-        if (waveform == null || waveform.isEmpty()) FloatArray(96) { 0.18f }
-        else FloatArray(waveform.size) { ((waveform[it].toInt() and 0xFF) / 255f).coerceAtLeast(0.06f) }
-    }
     val shown = (drag ?: progress).coerceIn(0f, 1f)
     val unplayed = LumenColors.paper3.copy(alpha = 0.5f)
 
     Canvas(
         modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .testTag("waveform")
+            .height(32.dp)
+            .testTag("scrubber")
             .pointerInput(Unit) {
                 detectTapGestures { offset -> onSeek((offset.x / size.width).coerceIn(0f, 1f)) }
             }
@@ -76,21 +71,11 @@ fun WaveformScrubber(
                 }
             },
     ) {
-        val count = bars.size
-        val gap = 2.dp.toPx()
-        val barWidth = (size.width - gap * (count - 1)) / count
-        val maxHeight = size.height * 0.82f
-        for (i in 0 until count) {
-            val height = (bars[i] * maxHeight).coerceAtLeast(3.dp.toPx())
-            val x = i * (barWidth + gap)
-            val played = (i + 0.5f) / count <= shown
-            drawRoundRect(
-                color = if (played) accent else unplayed,
-                topLeft = Offset(x, (size.height - height) / 2),
-                size = Size(barWidth, height),
-                cornerRadius = CornerRadius(barWidth / 2),
-            )
-        }
-        drawCircle(accent, radius = 5.dp.toPx(), center = Offset(size.width * shown, size.height / 2))
+        val thickness = 4.dp.toPx()
+        val top = (size.height - thickness) / 2
+        val corner = CornerRadius(thickness / 2)
+        drawRoundRect(unplayed, Offset(0f, top), Size(size.width, thickness), corner)
+        drawRoundRect(accent, Offset(0f, top), Size(size.width * shown, thickness), corner)
+        drawCircle(accent, radius = 7.dp.toPx(), center = Offset(size.width * shown, size.height / 2))
     }
 }

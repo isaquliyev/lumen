@@ -23,11 +23,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -76,6 +76,7 @@ import com.lumen.player.core.util.seededTone
 import com.lumen.player.feature.library.ConfirmDialog
 import com.lumen.player.feature.library.LocalTrackMenu
 import com.lumen.player.feature.library.lumenFieldColors
+import com.lumen.player.feature.player.PlayModeButton
 import com.lumen.player.feature.shell.AddSongsRoute
 import com.lumen.player.feature.shell.LocalBottomSpace
 import com.lumen.player.feature.shell.LocalNav
@@ -92,6 +93,7 @@ fun PlaylistScreen(viewModel: PlaylistViewModel = hiltViewModel()) {
     val playlist = state.playlist
     val nav = LocalNav.current
     val player = LocalPlayer.current
+    val shuffleOn by player.shuffleMode.collectAsStateWithLifecycle()
     val menu = LocalTrackMenu.current
     val haptics = LocalHapticFeedback.current
     var menuOpen by remember { mutableStateOf(false) }
@@ -143,6 +145,12 @@ fun PlaylistScreen(viewModel: PlaylistViewModel = hiltViewModel()) {
                                     }
                                     if (playlist.hasCustomCover) MenuItem("Remove custom cover") { viewModel.removeCover(); menuOpen = false }
                                     MenuItem(if (playlist.pinned) "Unpin" else "Pin") { viewModel.setPinned(!playlist.pinned); menuOpen = false }
+                                    DropdownMenuItem(
+                                        text = { Text("Keep songs out of Library", color = LumenColors.paper) },
+                                        trailingIcon = { if (playlist.hideSongs) Icon(Icons.Rounded.Check, null, tint = accent.accent) },
+                                        onClick = { viewModel.setHideSongs(!playlist.hideSongs); menuOpen = false },
+                                        modifier = Modifier.testTag("playlist_hide_songs"),
+                                    )
                                     MenuItem("Delete playlist", danger = true) { deleting = true; menuOpen = false }
                                 }
                             }
@@ -162,12 +170,14 @@ fun PlaylistScreen(viewModel: PlaylistViewModel = hiltViewModel()) {
                             "${formatCount(state.all.size, "song")} · ${formatLength(state.all.sumOf { it.durationMs })}",
                             style = LumenType.label, color = LumenColors.paper2,
                         )
+                        if (playlist.hideSongs) {
+                            Text("Hidden from Library", style = LumenType.label, color = LumenColors.paper3, modifier = Modifier.testTag("playlist_hidden_note"))
+                        }
                         Spacer(Modifier.height(16.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            PillButton("Play", { player.play(songs, 0, PlayContext.PLAYLIST, playlist.id, playlist.name) },
+                            PillButton("Play", { player.play(songs, -1, PlayContext.PLAYLIST, playlist.id, playlist.name, shuffle = shuffleOn) },
                                 icon = Icons.Rounded.PlayArrow, enabled = songs.isNotEmpty(), modifier = Modifier.testTag("playlist_play"))
-                            PillButton("Shuffle", { player.play(songs, -1, PlayContext.PLAYLIST, playlist.id, playlist.name, shuffle = true) },
-                                style = PillStyle.OUTLINED, icon = Icons.Rounded.Shuffle, enabled = songs.isNotEmpty(), modifier = Modifier.testTag("playlist_shuffle"))
+                            PlayModeButton(PlayContext.PLAYLIST, playlist.id)
                             PillButton("Add songs", { nav.open(AddSongsRoute(playlist.id)) }, style = PillStyle.OUTLINED,
                                 icon = Icons.Rounded.Add, modifier = Modifier.testTag("playlist_add_songs"))
                         }
@@ -187,7 +197,7 @@ fun PlaylistScreen(viewModel: PlaylistViewModel = hiltViewModel()) {
                         }
                         if (state.all.isNotEmpty()) {
                             Row(Modifier.fillMaxWidth().padding(horizontal = Space.side), verticalAlignment = Alignment.CenterVertically) {
-                                if (!editing) SortChip(PlaylistSort.entries, sort, { it.label }, { viewModel.sort.value = it })
+                                if (!editing) SortChip(PlaylistSort.entries, sort, { it.label }, { viewModel.setSort(it) })
                                 Spacer(Modifier.weight(1f))
                                 Text(
                                     if (editing) "Done" else "Edit",
@@ -241,7 +251,7 @@ fun PlaylistScreen(viewModel: PlaylistViewModel = hiltViewModel()) {
                 }
             } else {
                 itemsIndexed(songs, key = { _, it -> it.id }) { index, track ->
-                    TrackRowItem(track, onClick = { player.play(songs, index, PlayContext.PLAYLIST, playlist.id, playlist.name) }, onMore = { menu.open(track) })
+                    TrackRowItem(track, onClick = { player.play(songs, index, PlayContext.PLAYLIST, playlist.id, playlist.name, shuffle = shuffleOn) }, onMore = { menu.open(track) })
                 }
             }
         }

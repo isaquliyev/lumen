@@ -23,7 +23,6 @@ import com.lumen.player.core.util.normalize
 import com.lumen.player.core.util.rankedCandidates
 import com.lumen.player.core.util.sortKey
 import com.lumen.player.core.util.splitCredits
-import com.lumen.player.data.SettingsRepository
 import com.lumen.player.download.sources.DeezerApi
 import com.lumen.player.download.sources.DzAlbum
 import com.lumen.player.download.sources.DzTrack
@@ -87,7 +86,6 @@ class DownloadPipeline @Inject constructor(
     private val spotify: SpotifyResolver,
     private val youtube: YtDlpAudio,
     private val ytdlp: YtDlpManager,
-    private val settings: SettingsRepository,
 ) {
     @Volatile private var updatedThisRun = false
 
@@ -217,8 +215,11 @@ class DownloadPipeline @Inject constructor(
             .firstOrNull { meta.durationSec == null || abs(it.duration - meta.durationSec) <= 5 }
         if (hit != null) return fromDeezer(deezer.track(hit.id), meta.id, null)
         val split = splitCredits(cleanTitle, artistGuess)
+        // reuse an artist already in the library with the same name, so it is not listed twice
+        val known = db.artistDao().all().sortedBy { it.deezerId != null }.associateBy { normalize(it.name) }
         val credits = split.artists.mapIndexed { i, name ->
-            Credit(artistIdFor(null, name), name, null, null, if (i == 0) ArtistRole.MAIN else ArtistRole.FEATURED)
+            val match = known[normalize(name)]
+            Credit(match?.id ?: artistIdFor(null, name), match?.name ?: name, match?.deezerId, null, if (i == 0) ArtistRole.MAIN else ArtistRole.FEATURED)
         }
         return Resolved(
             title = split.title, durationSec = meta.durationSec, credits = credits, albumId = null, albumTitle = null,
@@ -244,9 +245,8 @@ class DownloadPipeline @Inject constructor(
 
     // yt-dlp progress 0..100 is shown as 35..90; one automatic yt-dlp update and retry on refusal
     private suspend fun downloadAudio(videoId: String, work: File, trackId: String, jobId: String, report: suspend (String, Int) -> Unit): File = coroutineScope {
-        val preferM4a = settings.current().preferM4a
         val progress = MutableStateFlow(-1)
-        suspend fun attempt(): File = youtube.download(videoId, work, trackId, jobId, preferM4a) { progress.value = it }
+        suspend fun attempt(): File = youtube.download(videoId, work, trackId, jobId) { progress.value = it }
         val ticker = launch {
             while (isActive) {
                 delay(500)
@@ -343,7 +343,7 @@ class DownloadPipeline @Inject constructor(
                     ArtistEntity(
                         id = credit.id, name = known?.name ?: credit.name, sortName = known?.sortName ?: sortKey(credit.name),
                         deezerId = credit.deezerId ?: known?.deezerId, hasImage = gotImage || known?.hasImage == true,
-                        toneHue = tone?.hue ?: known?.toneHue, toneSat = tone?.saturation ?: known?.toneSat,
+                        toneHue = tone?.hue ?: known?.toneHue, toneSat = tone?.saturation ?: known?.toneSat, hideSongs = known?.hideSongs == true,
                     )
                 )
             }
@@ -353,7 +353,7 @@ class DownloadPipeline @Inject constructor(
                     AlbumEntity(
                         id = albumId, title = resolved.albumTitle ?: known?.title ?: resolved.title, artistId = known?.artistId ?: primary.id,
                         releaseDate = resolved.album?.releaseDate ?: resolved.releaseDate ?: known?.releaseDate,
-                        genre = genre ?: known?.genre, coverTrackId = known?.coverTrackId ?: trackId,
+                        genre = genre ?: known?.genre, coverTrackId = known?.coverTrackId ?: trackId, hideSongs = known?.hideSongs == true,
                     )
                 )
             }

@@ -12,6 +12,7 @@ import com.lumen.player.data.FolderUsage
 import com.lumen.player.data.LibraryMaintenance
 import com.lumen.player.data.Settings
 import com.lumen.player.data.SettingsRepository
+import com.lumen.player.data.ThemeMode
 import com.lumen.player.download.sources.YtDlpManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,8 +62,8 @@ class SettingsViewModel @Inject constructor(
     fun setNormalize(value: Boolean) = viewModelScope.launch { repository.setNormalize(value) }
     fun setResumeOnLaunch(value: Boolean) = viewModelScope.launch { repository.setResumeOnLaunch(value) }
     fun setWifiOnly(value: Boolean) = viewModelScope.launch { repository.setWifiOnly(value) }
-    fun setParallel(value: Int) = viewModelScope.launch { repository.setParallelDownloads(value) }
-    fun setPreferM4a(value: Boolean) = viewModelScope.launch { repository.setPreferM4a(value) }
+    fun setTheme(mode: ThemeMode) = viewModelScope.launch { repository.setTheme(mode) }
+    fun setStereo(value: Boolean) = viewModelScope.launch { repository.setStereo(value) }
 
     fun setHidden(value: Boolean) = run(if (value) "Hiding songs…" else "Showing songs…") {
         repository.setHideFromOtherApps(value)

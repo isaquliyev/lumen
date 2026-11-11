@@ -3,6 +3,7 @@ package com.lumen.player.core.design
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,13 +31,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.lumen.player.core.util.formatLength
 import java.time.DayOfWeek
 import java.time.LocalDate
 import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 // 0 -> 1 once when a chart first appears (instant with Reduce motion)
@@ -63,28 +72,67 @@ fun CountUpText(value: Long, style: TextStyle, color: Color, modifier: Modifier 
     Text(format(shown), style = style, color = color, modifier = modifier)
 }
 
-// 24-hour radial chart, midnight at the top, a marker on the current hour
+// 24-hour radial chart, midnight at the top, a marker on the current hour. Stronger bars mean more
+// listening; the centre shows the peak hour, or the hour of a tapped bar
 @Composable
 fun RadialClock(values: LongArray, currentHour: Int, modifier: Modifier = Modifier) {
     val accent = LocalAccent.current.accent
     val progress = appearProgress(values.sum())
     val max = (values.maxOrNull() ?: 0L).coerceAtLeast(1)
+    val peak = values.indices.maxByOrNull { values[it] }?.takeIf { values[it] > 0 }
+    var picked by remember(values.contentHashCode()) { mutableStateOf<Int?>(null) }
+    val shown = picked ?: peak
+    val measurer = rememberTextMeasurer()
+    val emptyBar = LumenColors.ink3
+    val paper = LumenColors.paper
+    val hourLabel = LumenType.numeric.copy(color = LumenColors.paper3)
+    val hourLabelNow = LumenType.numeric.copy(color = paper)
     Box(modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxWidth().aspectRatio(1f)) {
+        Canvas(
+            Modifier.fillMaxWidth().aspectRatio(1f).pointerInput(Unit) {
+                detectTapGestures { tap ->
+                    val x = tap.x - size.width / 2f
+                    val y = tap.y - size.height / 2f
+                    if (hypot(x, y) < size.width * 0.21f) {
+                        picked = null
+                    } else {
+                        val hour = ((atan2(y, x) + PI / 2) / (2 * PI) * 24).roundToInt().mod(24)
+                        picked = hour.takeIf { it != picked }
+                    }
+                }
+            },
+        ) {
             val center = Offset(size.width / 2, size.height / 2)
-            val inner = size.minDimension * 0.18f
-            val outer = size.minDimension * 0.46f
+            val inner = size.minDimension * 0.21f
+            val outer = size.minDimension * 0.41f
+            val labelRadius = size.minDimension * 0.47f
+            val gap = 4.dp.toPx()
             drawCircle(LumenColors.line, inner, center, style = Stroke(1.dp.toPx()))
             for (hour in 0 until 24) {
                 val angle = (hour / 24.0 * 2 * PI - PI / 2).toFloat()
-                val length = (outer - inner) * (values[hour].toFloat() / max) * progress
-                val start = Offset(center.x + cos(angle) * (inner + 4.dp.toPx()), center.y + sin(angle) * (inner + 4.dp.toPx()))
-                val end = Offset(center.x + cos(angle) * (inner + 4.dp.toPx() + length.coerceAtLeast(2.dp.toPx())), center.y + sin(angle) * (inner + 4.dp.toPx() + length.coerceAtLeast(2.dp.toPx())))
-                drawLine(if (values[hour] > 0) accent else LumenColors.ink3, start, end, strokeWidth = 7.dp.toPx(), cap = StrokeCap.Round)
-                if (hour == currentHour) {
-                    val dot = Offset(center.x + cos(angle) * (outer + 10.dp.toPx()), center.y + sin(angle) * (outer + 10.dp.toPx()))
-                    drawCircle(LumenColors.paper, 3.dp.toPx(), dot)
+                val ratio = values[hour].toFloat() / max
+                val length = ((outer - inner) * ratio * progress).coerceAtLeast(2.dp.toPx())
+                val start = Offset(center.x + cos(angle) * (inner + gap), center.y + sin(angle) * (inner + gap))
+                val end = Offset(center.x + cos(angle) * (inner + gap + length), center.y + sin(angle) * (inner + gap + length))
+                val color = when {
+                    values[hour] == 0L -> emptyBar
+                    hour == picked -> paper
+                    else -> accent.copy(alpha = 0.35f + 0.65f * ratio)
                 }
+                drawLine(color, start, end, strokeWidth = 7.dp.toPx(), cap = StrokeCap.Round)
+                if (hour % 6 == 0) {
+                    val text = measurer.measure("%02d".format(hour), if (hour == currentHour) hourLabelNow else hourLabel)
+                    drawText(text, topLeft = Offset(center.x + cos(angle) * labelRadius - text.size.width / 2f, center.y + sin(angle) * labelRadius - text.size.height / 2f))
+                } else if (hour == currentHour) {
+                    drawCircle(paper, 3.dp.toPx(), Offset(center.x + cos(angle) * (outer + 10.dp.toPx()), center.y + sin(angle) * (outer + 10.dp.toPx())))
+                }
+            }
+        }
+        if (shown != null) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (shown == peak) Text("PEAK", style = LumenType.overline, color = LumenColors.paper3)
+                Text("%02d:00".format(shown), style = LumenType.title, color = paper)
+                Text(formatLength(values[shown]), style = LumenType.label, color = LumenColors.paper2)
             }
         }
     }

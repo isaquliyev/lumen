@@ -68,11 +68,11 @@ class DaoTest {
 
     @Test
     fun focusFilterIncludesFeaturedCredits() = runTest {
-        val all = db.trackDao().observeSongs(true, emptyList()).first()
+        val all = db.trackDao().observeSongs(true, emptyList(), true).first()
         assertEquals(3, all.size)
-        val focused = db.trackDao().observeSongs(false, listOf("artA")).first().map { it.id }.toSet()
+        val focused = db.trackDao().observeSongs(false, listOf("artA"), true).first().map { it.id }.toSet()
         assertEquals(setOf("t1", "t2"), focused)
-        val two = db.trackDao().observeSongs(false, listOf("artA", "artB")).first()
+        val two = db.trackDao().observeSongs(false, listOf("artA", "artB"), true).first()
         assertEquals(3, two.size)
         assertEquals("Artist B, Artist A", all.first { it.id == "t2" }.artistLine)
     }
@@ -119,7 +119,7 @@ class DaoTest {
     fun softDeleteKeepsPlayEventsAndAllowsReuse() = runTest {
         db.playEventDao().upsert(event("e1", "t1", 1000, 50_000))
         db.trackDao().softDelete("t1", 2000)
-        val ids = db.trackDao().observeSongs(true, emptyList()).first().map { it.id }
+        val ids = db.trackDao().observeSongs(true, emptyList(), true).first().map { it.id }
         assertTrue("t1" !in ids)
         assertEquals(1, db.playEventDao().count())
         val same = db.trackDao().findSame(11, null)

@@ -8,9 +8,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -21,6 +23,7 @@ import com.lumen.player.core.design.LocalPaths
 import com.lumen.player.core.design.LumenColors
 import com.lumen.player.core.design.LumenTheme
 import com.lumen.player.core.storage.LumenPaths
+import com.lumen.player.data.ThemeMode
 import com.lumen.player.feature.onboarding.OnboardingScreen
 import com.lumen.player.feature.shell.AppShell
 import com.lumen.player.playback.EXTRA_OPEN_PLAYER
@@ -37,13 +40,23 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-        )
+        enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
+            val systemDark = isSystemInDarkTheme()
+            val dark = when (settings?.theme) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> systemDark
+                else -> true
+            }
+            LumenColors.light = !dark
+            DisposableEffect(dark) {
+                val transparent = android.graphics.Color.TRANSPARENT
+                val style = if (dark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose {}
+            }
             LumenTheme(reduceMotion = settings?.reduceMotion ?: false) {
                 CompositionLocalProvider(LocalPaths provides paths) {
                     Box(
@@ -71,9 +84,6 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_OPEN_PLAYER, false) == true) viewModel.openPlayer()
-        if (intent?.hasExtra(com.lumen.player.feature.recap.EXTRA_RECAP_YEAR) == true) {
-            viewModel.openRecap(intent.getIntExtra(com.lumen.player.feature.recap.EXTRA_RECAP_YEAR, 0), intent.getIntExtra(com.lumen.player.feature.recap.EXTRA_RECAP_MONTH, 0))
-        }
         if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             intent.getStringExtra(Intent.EXTRA_TEXT)?.let(viewModel::handleShared)
         }

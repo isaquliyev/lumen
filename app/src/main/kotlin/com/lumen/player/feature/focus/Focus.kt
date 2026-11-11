@@ -81,6 +81,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 // shell-level Artist Focus state and actions
@@ -102,15 +103,21 @@ class FocusViewModel @Inject constructor(
     val sheetOpen = MutableStateFlow(false)
 
     init {
-        // turning Focus on while a non-matching song plays: keep playing, offer to switch
+        // turning Focus on while a matching song plays: the queue keeps only the focused artists' songs;
+        // while a non-matching song plays: keep playing, offer to switch
         viewModelScope.launch {
             repository.focus.drop(1).collect { focus ->
                 if (focus.off) return@collect
                 val playing = connection.nowPlaying.value ?: return@collect
-                val matches = tracks.songs.first().any { it.id == playing.id }
+                val focused = tracks.songsWithHidden.first()
+                val matches = focused.any { it.id == playing.id }
                 android.util.Log.d("Lumen", "focus changed: playing=${playing.title} matches=$matches isPlaying=${connection.isPlaying.value}")
-                if (!matches && connection.isPlaying.value) {
-                    val names = focusedArtists.first { list -> list.isNotEmpty() || focus.off }.joinToString(" & ") { it.name }
+                val artists = withTimeoutOrNull(1_000) { focusedArtists.first { list -> list.map { it.id }.toSet() == focus.ids } }
+                val names = (artists ?: focusedArtists.value).joinToString(" & ") { it.name }
+                if (matches) {
+                    queue.keepOnly(focused.map { it.id }.toSet(), tracks.songs.first())
+                    events.show("Playing only $names")
+                } else if (connection.isPlaying.value) {
                     events.show("Play only $names now?", "Play") { playFocused() }
                 }
             }

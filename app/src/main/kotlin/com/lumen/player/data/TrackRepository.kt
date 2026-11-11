@@ -23,10 +23,14 @@ class TrackRepository @Inject constructor(
 ) {
     private val tracks = db.trackDao()
 
-    // all songs, filtered by Artist Focus when it's on
-    val songs: Flow<List<TrackRow>> = focusRepository.focus.flatMapLatest { tracks.observeSongs(it.off, it.idList) }
+    // library songs without the ones kept out of Library; Artist Focus shows only the focused artists,
+    // hidden songs included, because choosing an artist is asking for their songs
+    val songs: Flow<List<TrackRow>> = focusRepository.focus.flatMapLatest { tracks.observeSongs(it.off, it.idList, it.active) }
 
-    val allSongs: Flow<List<TrackRow>> = tracks.observeSongs(true, emptyList())
+    // like songs, but with the hidden playlist songs too (search, playlists)
+    val songsWithHidden: Flow<List<TrackRow>> = focusRepository.focus.flatMapLatest { tracks.observeSongs(it.off, it.idList, true) }
+
+    val allSongs: Flow<List<TrackRow>> = tracks.observeSongs(true, emptyList(), true)
 
     fun observe(id: String) = tracks.observeRow(id)
 

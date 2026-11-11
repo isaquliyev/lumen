@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -41,7 +40,6 @@ import com.lumen.player.core.design.LocalAccent
 import com.lumen.player.core.design.LumenColors
 import com.lumen.player.core.design.LumenType
 import com.lumen.player.core.design.PillButton
-import com.lumen.player.core.design.PillStyle
 import com.lumen.player.core.design.Radii
 import com.lumen.player.core.design.Space
 import com.lumen.player.core.design.TrackRowItem
@@ -52,6 +50,7 @@ import com.lumen.player.data.SmartPlaylists
 import com.lumen.player.feature.library.LocalTrackMenu
 import com.lumen.player.feature.shell.LocalBottomSpace
 import com.lumen.player.feature.shell.LocalNav
+import com.lumen.player.feature.player.PlayModeButton
 import com.lumen.player.feature.shell.LocalPlayer
 import com.lumen.player.feature.shell.SmartPlaylistRoute
 import com.lumen.player.feature.shell.bottomPadding
@@ -74,6 +73,7 @@ fun SmartPlaylistScreen(viewModel: SmartPlaylistViewModel = hiltViewModel()) {
     val kind = viewModel.kind
     val nav = LocalNav.current
     val player = LocalPlayer.current
+    val shuffleOn by player.shuffleMode.collectAsStateWithLifecycle()
     val menu = LocalTrackMenu.current
     val context = if (kind == SmartKind.LIKED) PlayContext.LIKED else PlayContext.PLAYLIST
     val accent = LocalAccent.current
@@ -94,9 +94,8 @@ fun SmartPlaylistScreen(viewModel: SmartPlaylistViewModel = hiltViewModel()) {
                     Text("${formatCount(songs.size, "song")} · ${formatLength(songs.sumOf { it.durationMs })}", style = LumenType.label, color = LumenColors.paper2)
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PillButton("Play", { player.play(songs, 0, context, kind.name, kind.title) }, icon = Icons.Rounded.PlayArrow, enabled = songs.isNotEmpty())
-                        PillButton("Shuffle", { player.play(songs, -1, context, kind.name, kind.title, shuffle = true) },
-                            style = PillStyle.OUTLINED, icon = Icons.Rounded.Shuffle, enabled = songs.isNotEmpty())
+                        PillButton("Play", { player.play(songs, -1, context, kind.name, kind.title, shuffle = shuffleOn) }, icon = Icons.Rounded.PlayArrow, enabled = songs.isNotEmpty())
+                        PlayModeButton(context, kind.name)
                     }
                     Spacer(Modifier.height(12.dp))
                 }
@@ -104,7 +103,7 @@ fun SmartPlaylistScreen(viewModel: SmartPlaylistViewModel = hiltViewModel()) {
         }
         if (songs.isEmpty()) item { EmptyState("Nothing here yet.", kind.subtitle) }
         itemsIndexed(songs, key = { _, it -> it.id }) { index, track ->
-            TrackRowItem(track, onClick = { player.play(songs, index, context, kind.name, kind.title) }, onMore = { menu.open(track) })
+            TrackRowItem(track, onClick = { player.play(songs, index, context, kind.name, kind.title, shuffle = shuffleOn) }, onMore = { menu.open(track) })
         }
     }
 }

@@ -1,13 +1,20 @@
 package com.lumen.player.playback
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.media.audiofx.LoudnessEnhancer
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.ListenableFuture
@@ -30,6 +37,7 @@ import kotlin.math.pow
 
 const val EXTRA_OPEN_PLAYER = "open_player"
 
+@OptIn(UnstableApi::class)
 @AndroidEntryPoint
 class PlaybackService : MediaSessionService() {
 
@@ -43,10 +51,21 @@ class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private var saver: Job? = null
     @Volatile private var normalize = true
+    @Volatile private var mono = false
+    private var enhancer: LoudnessEnhancer? = null
 
     override fun onCreate() {
         super.onCreate()
-        val player = ExoPlayer.Builder(this)
+        // a custom audio sink so the mono processor sits in the audio path
+        val renderers = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
+                DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(MonoAudioProcessor { mono }))
+                    .build()
+        }
+        val player = ExoPlayer.Builder(this, renderers)
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 true,
@@ -55,6 +74,8 @@ class PlaybackService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
         player.shuffleModeEnabled = false
+        // after the last song the queue starts again from the first one
+        player.repeatMode = Player.REPEAT_MODE_ALL
 
         val openPlayer = PendingIntent.getActivity(
             this, 0,
@@ -68,6 +89,11 @@ class PlaybackService : MediaSessionService() {
 
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = applyGain(player)
+
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                attachEnhancer(audioSessionId)
+                applyGain(player)
+            }
 
             // skips and queue edits while paused are saved too
             override fun onEvents(p: Player, events: Player.Events) {
@@ -84,7 +110,14 @@ class PlaybackService : MediaSessionService() {
             }
         })
 
-        scope.launch { settings.settings.collect { normalize = it.normalize; applyGain(player) } }
+        attachEnhancer(player.audioSessionId)
+        scope.launch {
+            settings.settings.collect {
+                normalize = it.normalize
+                mono = !it.stereo
+                applyGain(player)
+            }
+        }
         extras.attach(player, scope)
         extras.onRestoreVolume = { applyGain(player) }
         tracker.attach(player)
@@ -94,7 +127,7 @@ class PlaybackService : MediaSessionService() {
             if (settings.settings.first().resumeOnLaunch && player.mediaItemCount == 0) {
                 queue.restoreItems()?.let { (items, saved) ->
                     player.setMediaItems(items, saved.index, saved.positionMs)
-                    player.repeatMode = saved.repeatMode
+                    player.repeatMode = queue.restoredRepeatMode(saved.repeatMode)
                     player.prepare()
                 }
             }
@@ -102,10 +135,24 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    // loud songs: lower the player volume. quiet songs: boost with LoudnessEnhancer,
+    // which also limits the peaks so the boost does not clip
     private fun applyGain(player: Player) {
         if (extras.fading) return
-        val gain = player.currentMediaItem?.mediaMetadata?.extras?.getFloat(EXTRA_GAIN) ?: 0f
-        player.volume = if (normalize) 10f.pow(gain.coerceAtMost(0f) / 20f) else 1f
+        val stored = player.currentMediaItem?.mediaMetadata?.extras?.getFloat(EXTRA_GAIN) ?: 0f
+        val gain = if (normalize) stored else 0f
+        player.volume = 10f.pow(gain.coerceAtMost(0f) / 20f)
+        enhancer?.let { effect ->
+            runCatching {
+                effect.setTargetGain((gain.coerceAtLeast(0f) * 100).toInt())
+                effect.enabled = gain > 0f
+            }
+        }
+    }
+
+    private fun attachEnhancer(sessionId: Int) {
+        enhancer?.release()
+        enhancer = if (sessionId == C.AUDIO_SESSION_ID_UNSET) null else runCatching { LoudnessEnhancer(sessionId) }.getOrNull()
     }
 
     private fun startSaver(player: Player) {
@@ -113,24 +160,24 @@ class PlaybackService : MediaSessionService() {
         saver = scope.launch {
             while (isActive) {
                 queue.save(player)
-                delay(5_000)
+                delay(15_000)
             }
         }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
+    // swiping the app away from recents stops the music and the service
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val player = session?.player
-        if (player == null || !player.playWhenReady || player.mediaItemCount == 0 || player.playbackState == Player.STATE_ENDED) {
-            stopSelf()
-        }
+        pauseAllPlayersAndStopSelf()
     }
 
     override fun onDestroy() {
         session?.let { s ->
             runCatching { runBlocking { queue.save(s.player) } }
             tracker.release()
+            enhancer?.release()
+            enhancer = null
             extras.detach()
             holder.player.value = null
             s.player.release()

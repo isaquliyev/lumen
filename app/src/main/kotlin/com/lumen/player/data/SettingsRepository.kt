@@ -14,6 +14,8 @@ import javax.inject.Singleton
 
 enum class StorageMode { SHARED, PRIVATE }
 
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
 data class Settings(
     val onboardingDone: Boolean = false,
     val storageMode: StorageMode? = null,
@@ -21,9 +23,15 @@ data class Settings(
     val normalize: Boolean = true,
     val resumeOnLaunch: Boolean = true,
     val wifiOnly: Boolean = false,
-    val parallelDownloads: Int = 2,
-    val preferM4a: Boolean = true,
     val hideFromOtherApps: Boolean = true,
+    val theme: ThemeMode = ThemeMode.DARK,
+    val stereo: Boolean = true,
+    val playlistGrid: Boolean = false,
+    val songSort: String? = null,
+    val artistSort: String? = null,
+    val libraryTab: Int = 0,
+    val songsShuffle: Boolean = false,
+    val pulseRange: String? = null,
 )
 
 @Singleton
@@ -36,9 +44,16 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
         val normalize = booleanPreferencesKey("normalize")
         val resumeOnLaunch = booleanPreferencesKey("resume_on_launch")
         val wifiOnly = booleanPreferencesKey("wifi_only")
-        val parallelDownloads = intPreferencesKey("parallel_downloads")
-        val preferM4a = booleanPreferencesKey("prefer_m4a")
         val hideFromOtherApps = booleanPreferencesKey("hide_from_other_apps")
+        val theme = stringPreferencesKey("theme")
+        val stereo = booleanPreferencesKey("stereo")
+        val playlistGrid = booleanPreferencesKey("playlist_grid")
+        val songSort = stringPreferencesKey("song_sort")
+        val artistSort = stringPreferencesKey("artist_sort")
+        val libraryTab = intPreferencesKey("library_tab")
+        val songsShuffle = booleanPreferencesKey("songs_shuffle")
+        val pulseRange = stringPreferencesKey("pulse_range")
+        fun playlistSort(id: String) = stringPreferencesKey("playlist_sort_$id")
     }
 
     val settings: Flow<Settings> = store.data.map { p ->
@@ -49,9 +64,15 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
             normalize = p[Keys.normalize] ?: true,
             resumeOnLaunch = p[Keys.resumeOnLaunch] ?: true,
             wifiOnly = p[Keys.wifiOnly] ?: false,
-            parallelDownloads = p[Keys.parallelDownloads] ?: 2,
-            preferM4a = p[Keys.preferM4a] ?: true,
             hideFromOtherApps = p[Keys.hideFromOtherApps] ?: true,
+            theme = p[Keys.theme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.DARK,
+            stereo = p[Keys.stereo] ?: true,
+            playlistGrid = p[Keys.playlistGrid] ?: false,
+            songSort = p[Keys.songSort],
+            artistSort = p[Keys.artistSort],
+            libraryTab = p[Keys.libraryTab] ?: 0,
+            songsShuffle = p[Keys.songsShuffle] ?: false,
+            pulseRange = p[Keys.pulseRange],
         )
     }
 
@@ -63,7 +84,16 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
     suspend fun setNormalize(value: Boolean) = store.edit { it[Keys.normalize] = value }
     suspend fun setResumeOnLaunch(value: Boolean) = store.edit { it[Keys.resumeOnLaunch] = value }
     suspend fun setWifiOnly(value: Boolean) = store.edit { it[Keys.wifiOnly] = value }
-    suspend fun setParallelDownloads(value: Int) = store.edit { it[Keys.parallelDownloads] = value.coerceIn(1, 3) }
-    suspend fun setPreferM4a(value: Boolean) = store.edit { it[Keys.preferM4a] = value }
     suspend fun setHideFromOtherApps(value: Boolean) = store.edit { it[Keys.hideFromOtherApps] = value }
+    suspend fun setTheme(mode: ThemeMode) = store.edit { it[Keys.theme] = mode.name }
+    suspend fun setStereo(value: Boolean) = store.edit { it[Keys.stereo] = value }
+    suspend fun setPlaylistGrid(value: Boolean) = store.edit { it[Keys.playlistGrid] = value }
+    suspend fun setSongSort(value: String) = store.edit { it[Keys.songSort] = value }
+    suspend fun setArtistSort(value: String) = store.edit { it[Keys.artistSort] = value }
+    suspend fun setLibraryTab(value: Int) = store.edit { it[Keys.libraryTab] = value }
+    suspend fun setSongsShuffle(value: Boolean) = store.edit { it[Keys.songsShuffle] = value }
+    suspend fun setPulseRange(value: String) = store.edit { it[Keys.pulseRange] = value }
+
+    fun playlistSort(id: String): Flow<String?> = store.data.map { it[Keys.playlistSort(id)] }
+    suspend fun setPlaylistSort(id: String, value: String) = store.edit { it[Keys.playlistSort(id)] = value }
 }

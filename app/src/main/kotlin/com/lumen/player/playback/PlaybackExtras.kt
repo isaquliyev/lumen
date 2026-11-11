@@ -32,7 +32,9 @@ class PlaybackExtras @Inject constructor() {
 
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            if (_sleep.value == SleepState.EndOfSong && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+            // REPEAT: the same song starting again (one-song queue or "repeat one")
+            val songEnded = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
+            if (_sleep.value == SleepState.EndOfSong && songEnded) {
                 player?.pause()
                 player?.seekTo(player?.currentMediaItemIndex ?: 0, 0)
                 cancelSleep()

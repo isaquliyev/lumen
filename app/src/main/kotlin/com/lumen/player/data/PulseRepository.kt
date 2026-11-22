@@ -1,5 +1,6 @@
 package com.lumen.player.data
 
+import com.lumen.player.core.db.IdleTrack
 import com.lumen.player.core.db.AlbumDao
 import com.lumen.player.core.db.ArtistDao
 import com.lumen.player.core.db.LumenDatabase
@@ -34,6 +35,7 @@ data class PulseData(
     val plays: Int = 0,
     val changePct: Int? = null,
     val topSongs: List<RankedTrack> = emptyList(),
+    val idleSongs: List<IdleTrack> = emptyList(),
     val topArtists: List<RankedArtist> = emptyList(),
     val topAlbums: List<RankedAlbum> = emptyList(),
     val genres: List<Share> = emptyList(),
@@ -122,6 +124,7 @@ class PulseRepository @Inject constructor(
                 plays = events.count(StatsCalculator::isPlay),
                 changePct = previous?.let { StatsCalculator.change(total, it) },
                 topSongs = topTracks.mapNotNull { t -> rows[t.trackId]?.let { RankedTrack(it, t.plays, t.listenedMs) } },
+                idleSongs = stats.leastRecent(50, off, ids).first(),
                 topArtists = topArtistRows.mapNotNull { a ->
                     artistNames[a.artistId]?.let { RankedArtist(it.id, it.name, it.hasImage, a.listenedMs, a.plays) }
                 },

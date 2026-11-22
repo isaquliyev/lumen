@@ -1,5 +1,7 @@
 package com.lumen.player.feature.focus
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -166,7 +168,8 @@ fun FocusVignette(color: androidx.compose.ui.graphics.Color, modifier: Modifier 
     )
 }
 
-// "Talk Talk ✕" pill under screen titles while Focus is on
+// pill under screen titles while Focus is on: the focused artists' photos (no names, so several
+// artists stay tidy), "+N" beyond five, and ✕ to clear
 @Composable
 fun FocusPill(modifier: Modifier = Modifier) {
     val viewModel = LocalFocusActions.current
@@ -182,25 +185,22 @@ fun FocusPill(modifier: Modifier = Modifier) {
                 .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box {
-                artists.take(3).forEachIndexed { i, artist ->
+            val shown = artists.take(5)
+            Box(Modifier.semantics { contentDescription = "Focus on " + artists.joinToString(", ") { it.name } }) {
+                shown.forEachIndexed { i, artist ->
                     ArtistAvatar(
                         artistThumb(artist.id, artist.hasImage),
                         artist.name,
-                        Modifier.offset(x = (i * 14).dp).size(24.dp).border(1.5.dp, LumenColors.ink, CircleShape),
+                        Modifier.offset(x = (i * 18).dp).size(26.dp).border(1.5.dp, LumenColors.ink, CircleShape),
                         letterSize = LumenType.label.fontSize,
                     )
                 }
             }
-            Spacer(Modifier.width((10 + (artists.take(3).size - 1) * 14).dp))
-            Text(
-                artists.joinToString(" & ") { it.name },
-                style = LumenType.label,
-                color = accent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
+            // the photos overlap with offsets, which take no layout space, so reserve the extra width here
+            Spacer(Modifier.width(((shown.size - 1) * 18 + 4).dp))
+            if (artists.size > shown.size) {
+                Text("+${artists.size - shown.size}", style = LumenType.numeric, color = accent, modifier = Modifier.padding(start = 6.dp))
+            }
             Icon(
                 Icons.Rounded.Close,
                 "Clear focus",

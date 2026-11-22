@@ -77,4 +77,15 @@ class ParsingTest {
         assertEquals("Fan", entries[1].channel)
         assertNull(entries[1].durationSec)
     }
+
+    @Test
+    fun ytDlpStreamLink() {
+        val single = """{"id":"abc","url":"https://rr1.googlevideo.com/a","http_headers":{"User-Agent":"Mozilla/5.0","Accept":"*/*"}}"""
+        val link = YtDlpParse.stream(single)
+        assertEquals("https://rr1.googlevideo.com/a", link.url)
+        assertEquals("Mozilla/5.0", link.headers["User-Agent"])
+        val merged = """{"id":"abc","requested_formats":[{"url":"https://rr2.googlevideo.com/b"}]}"""
+        assertEquals("https://rr2.googlevideo.com/b", YtDlpParse.stream(merged).url)
+        assertEquals(emptyMap<String, String>(), YtDlpParse.stream(merged).headers)
+    }
 }

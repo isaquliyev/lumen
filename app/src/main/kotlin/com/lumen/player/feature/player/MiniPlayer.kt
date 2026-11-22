@@ -1,5 +1,6 @@
 package com.lumen.player.feature.player
 
+import com.lumen.player.playback.isStream
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -86,6 +87,10 @@ fun MiniPlayer(track: TrackRow, viewModel: PlayerViewModel, onExpand: () -> Unit
         Column(Modifier.weight(1f)) {
             Text(track.title, style = LumenType.body, color = LumenColors.paper, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(track.artistLine.orEmpty(), style = LumenType.label, color = LumenColors.paper2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (isStream(track.id)) {
+            val save by viewModel.streamSave.collectAsStateWithLifecycle()
+            save?.let { StreamSaveButton(it, viewModel::saveStream, tint = LumenColors.paper2) }
         }
         IconButton(
             onClick = {

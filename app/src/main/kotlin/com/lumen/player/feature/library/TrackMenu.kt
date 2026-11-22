@@ -1,5 +1,9 @@
 package com.lumen.player.feature.library
 
+import androidx.compose.material.icons.rounded.Download
+import com.lumen.player.download.StreamSaver
+import com.lumen.player.playback.StreamInfo
+import com.lumen.player.playback.Streams
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -93,6 +97,7 @@ class TrackMenuViewModel @Inject constructor(
     private val focus: FocusRepository,
     private val events: AppEvents,
     private val queue: QueueManager,
+    private val saver: StreamSaver,
 ) : ViewModel() {
     val track = MutableStateFlow<TrackRow?>(null)
     val candidates = MutableStateFlow<List<CandidateUi>?>(null)
@@ -110,6 +115,16 @@ class TrackMenuViewModel @Inject constructor(
     fun editInfo(row: TrackRow, title: String, genre: String) = viewModelScope.launch {
         tracks.editInfo(row.id, title, genre)
         events.show("Info saved")
+    }
+
+    fun saveStream(info: StreamInfo) = viewModelScope.launch {
+        saver.save(info)
+        events.show("Downloading “${info.title}”")
+    }
+
+    fun likeStream(info: StreamInfo) = viewModelScope.launch {
+        events.show("Downloading. It will be added to Liked Songs")
+        saver.whenSaved(info) { tracks.setLiked(it, true) }
     }
 
     fun addToQueue(row: TrackRow) = viewModelScope.launch {
@@ -192,30 +207,37 @@ fun TrackMenuHost(viewModel: TrackMenuViewModel = hiltViewModel(), content: @Com
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                MenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue", "menu_add_queue") { viewModel.addToQueue(row); close() }
-                MenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist…", "menu_add_playlist") { close(); addToPlaylist(listOf(row.id)) }
-                val liked = row.likedAt != null
-                MenuRow(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Unlike" else "Like", "menu_like") {
-                    viewModel.setLiked(row, !liked); close()
+                val stream = Streams.get(row.id)
+                if (stream != null) {
+                    MenuRow(Icons.Rounded.Download, "Download", "menu_download") { viewModel.saveStream(stream); close() }
+                    MenuRow(Icons.Rounded.FavoriteBorder, "Like", "menu_like") { viewModel.likeStream(stream); close() }
+                    MenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist…", "menu_add_playlist") { close(); addToPlaylist(listOf(row.id)) }
+                } else {
+                    MenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue", "menu_add_queue") { viewModel.addToQueue(row); close() }
+                    MenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist…", "menu_add_playlist") { close(); addToPlaylist(listOf(row.id)) }
+                    val liked = row.likedAt != null
+                    MenuRow(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Unlike" else "Like", "menu_like") {
+                        viewModel.setLiked(row, !liked); close()
+                    }
+                    row.primaryArtistId?.let { artistId ->
+                        MenuRow(Icons.Rounded.Person, "Go to artist", "menu_artist") { close(); nav.open(ArtistRoute(artistId)) }
+                    }
+                    row.albumId?.let { albumId ->
+                        MenuRow(Icons.Rounded.Album, "Go to album", "menu_album") { close(); nav.open(AlbumRoute(albumId)) }
+                    }
+                    if (row.primaryArtistId != null) {
+                        MenuRow(Icons.Rounded.CenterFocusStrong, "Focus on artist", "menu_focus") { viewModel.focusOn(row); close() }
+                    }
+                    MenuRow(Icons.Rounded.Edit, "Edit info", "menu_edit") { editing = row; close() }
+                    MenuRow(Icons.Rounded.Lyrics, "Lyrics: re-fetch", "menu_lyrics") { viewModel.refetchLyrics(row); close() }
+                    if (row.lyricsKind == LyricsKind.SYNCED) {
+                        MenuRow(Icons.Rounded.Timer, "Lyrics: adjust offset", "menu_offset") { offsetFor = row; close() }
+                    }
+                    MenuRow(Icons.Rounded.SwapHoriz, "Wrong audio? Choose another", "menu_replace") {
+                        replacing = row; viewModel.loadCandidates(row); close()
+                    }
+                    MenuRow(Icons.Rounded.Delete, "Delete from device", "menu_delete", danger = true) { deleting = row; close() }
                 }
-                row.primaryArtistId?.let { artistId ->
-                    MenuRow(Icons.Rounded.Person, "Go to artist", "menu_artist") { close(); nav.open(ArtistRoute(artistId)) }
-                }
-                row.albumId?.let { albumId ->
-                    MenuRow(Icons.Rounded.Album, "Go to album", "menu_album") { close(); nav.open(AlbumRoute(albumId)) }
-                }
-                if (row.primaryArtistId != null) {
-                    MenuRow(Icons.Rounded.CenterFocusStrong, "Focus on artist", "menu_focus") { viewModel.focusOn(row); close() }
-                }
-                MenuRow(Icons.Rounded.Edit, "Edit info", "menu_edit") { editing = row; close() }
-                MenuRow(Icons.Rounded.Lyrics, "Lyrics: re-fetch", "menu_lyrics") { viewModel.refetchLyrics(row); close() }
-                if (row.lyricsKind == LyricsKind.SYNCED) {
-                    MenuRow(Icons.Rounded.Timer, "Lyrics: adjust offset", "menu_offset") { offsetFor = row; close() }
-                }
-                MenuRow(Icons.Rounded.SwapHoriz, "Wrong audio? Choose another", "menu_replace") {
-                    replacing = row; viewModel.loadCandidates(row); close()
-                }
-                MenuRow(Icons.Rounded.Delete, "Delete from device", "menu_delete", danger = true) { deleting = row; close() }
             }
         }
     }

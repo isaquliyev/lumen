@@ -84,6 +84,7 @@ import com.lumen.player.download.youtubeVideoId
 import com.lumen.player.download.sources.DzTrack
 import com.lumen.player.feature.shell.LocalBottomSpace
 import com.lumen.player.feature.shell.LocalPlayer
+import com.lumen.player.playback.streamIdOf
 import com.lumen.player.feature.shell.bottomPadding
 
 @Composable
@@ -94,6 +95,7 @@ fun AddScreen(onPlayTrack: (String) -> Unit = {}, viewModel: AddViewModel = hilt
     val jobs by viewModel.jobs.collectAsStateWithLifecycle()
     val inLibrary by viewModel.inLibrary.collectAsStateWithLifecycle()
     val album by viewModel.album.collectAsStateWithLifecycle()
+    val preparing by viewModel.preparing.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     var choosing by remember { mutableStateOf<DownloadJobEntity?>(null) }
@@ -166,7 +168,9 @@ fun AddScreen(onPlayTrack: (String) -> Unit = {}, viewModel: AddViewModel = hilt
                     subtitle = listOfNotNull(track.artist.name, track.album?.title).joinToString(" · "),
                     trackId = inLibrary[track.id],
                     job = downloading[track.id],
+                    preparing = preparing == track.id,
                     onAdd = { viewModel.add(track) },
+                    onStream = { viewModel.stream(track, track.album?.coverXl ?: track.album?.coverMedium) },
                     onCancel = viewModel::cancel,
                     onPlay = onPlayTrack,
                 )
@@ -203,6 +207,8 @@ fun AddScreen(onPlayTrack: (String) -> Unit = {}, viewModel: AddViewModel = hilt
             onAddAll = { viewModel.addAll(sheet.tracks, sheet.album.coverMedium, downloading.keys) },
             onCancel = viewModel::cancel,
             onPlay = onPlayTrack,
+            preparing = preparing,
+            onStream = { track -> viewModel.stream(track, sheet.album.coverXl ?: sheet.album.coverMedium) },
         )
     }
 
@@ -316,6 +322,7 @@ private fun ResultRow(
     subtitle: String,
     meta: String? = null,
     tag: String? = null,
+    highlight: Boolean = false,
     onClick: (() -> Unit)? = null,
     trailing: @Composable () -> Unit,
 ) {
@@ -331,7 +338,7 @@ private fun ResultRow(
         CoverImage(cover, title, Modifier.size(48.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = LumenType.body, color = LumenColors.paper, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = LumenType.body, color = if (highlight) LocalAccent.current.accent else LumenColors.paper, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, style = LumenType.label, color = LumenColors.paper2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (meta != null) Text(meta, style = LumenType.numeric, color = LumenColors.paper3, modifier = Modifier.padding(horizontal = 4.dp))
@@ -347,14 +354,17 @@ private fun TrackResult(
     subtitle: String,
     trackId: String?,
     job: DownloadJobEntity?,
+    preparing: Boolean,
     onAdd: () -> Unit,
+    onStream: () -> Unit,
     onCancel: (String) -> Unit,
     onPlay: (String) -> Unit,
 ) {
     val player = LocalPlayer.current
     val nowPlaying by player.nowPlaying.collectAsStateWithLifecycle()
     val isPlaying by player.isPlaying.collectAsStateWithLifecycle()
-    val current = trackId != null && nowPlaying?.id == trackId
+    // the song is loaded in the player, from the library or streamed
+    val current = nowPlaying?.id == (trackId ?: streamIdOf(track.id))
     // the song already loaded in the player pauses and resumes instead of starting over
     fun playOrToggle(id: String) = if (current) player.connection.playPause() else onPlay(id)
     ResultRow(
@@ -363,10 +373,12 @@ private fun TrackResult(
         subtitle = subtitle,
         meta = formatClock(track.duration * 1000L),
         tag = "result_${track.id}",
+        highlight = current,
         onClick = {
             when {
                 trackId != null -> playOrToggle(trackId)
-                job == null -> onAdd()
+                current -> player.connection.playPause()
+                !preparing -> onStream()
             }
         },
         trailing = {
@@ -397,6 +409,10 @@ private fun TrackResult(
                     if (current && isPlaying) Icon(Icons.Rounded.Pause, "Pause", tint = LocalAccent.current.accent)
                     else Icon(Icons.Rounded.PlayArrow, "Play", tint = LocalAccent.current.accent)
                 }
+                // finding the audio to stream: a quiet spinner, no stop button
+                preparing -> Box(Modifier.size(48.dp).testTag("preparing_${track.id}"), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(20.dp), color = LumenColors.paper2, strokeWidth = 2.dp)
+                }
                 else -> IconButton(onClick = onAdd, modifier = Modifier.testTag("add_${track.id}")) {
                     Icon(Icons.Rounded.Add, "Add", tint = LumenColors.paper)
                 }
@@ -416,6 +432,8 @@ private fun AlbumSheetView(
     onAddAll: () -> Unit,
     onCancel: (String) -> Unit,
     onPlay: (String) -> Unit,
+    preparing: Long?,
+    onStream: (DzTrack) -> Unit,
 ) {
     val album = sheet.album
     ModalBottomSheet(
@@ -459,7 +477,9 @@ private fun AlbumSheetView(
                     subtitle = track.artist.name,
                     trackId = inLibrary[track.id],
                     job = downloading[track.id],
+                    preparing = preparing == track.id,
                     onAdd = { onAdd(track) },
+                    onStream = { onStream(track) },
                     onCancel = onCancel,
                     onPlay = onPlay,
                 )

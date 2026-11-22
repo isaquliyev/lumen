@@ -10,11 +10,16 @@ import com.lumen.player.download.DownloadQueue
 import com.lumen.player.download.DownloadRequest
 import com.lumen.player.download.JobFailure
 import com.lumen.player.download.LinkHandler
+import com.lumen.player.download.StreamResolver
 import com.lumen.player.download.sources.DeezerApi
 import com.lumen.player.download.sources.DzAlbum
 import com.lumen.player.download.sources.DzTrack
 import com.lumen.player.download.sources.YtDlpManager
+import com.lumen.player.playback.QueueManager
+import com.lumen.player.playback.Streams
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,6 +49,8 @@ class AddViewModel @Inject constructor(
     private val queue: DownloadQueue,
     private val links: LinkHandler,
     private val events: AppEvents,
+    private val resolver: StreamResolver,
+    private val player: QueueManager,
     ytdlp: YtDlpManager,
     jobDao: DownloadJobDao,
 ) : ViewModel() {
@@ -77,13 +84,40 @@ class AddViewModel @Inject constructor(
     }
 
     fun add(track: DzTrack, cover: String? = track.album?.coverMedium) = viewModelScope.launch {
-        queue.enqueue(DownloadRequest.DeezerPick(track.id), track.title, track.artist.name, cover)
+        queue.enqueue(DownloadRequest.DeezerPick(track.id, Streams.videoFor(track.id)), track.title, track.artist.name, cover)
+    }
+
+    // the song being prepared for streaming (finding its audio takes a few seconds)
+    private val _preparing = MutableStateFlow<Long?>(null)
+    val preparing: StateFlow<Long?> = _preparing.asStateFlow()
+    private var streamJob: Job? = null
+
+    fun stream(track: DzTrack, cover: String?) {
+        streamJob?.cancel()
+        _preparing.value = track.id
+        streamJob = viewModelScope.launch {
+            try {
+                player.playStream(resolver.prepare(track, cover))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                events.show(
+                    when {
+                        e.isOffline() -> "No internet connection."
+                        e is JobFailure -> e.message ?: "Couldn't play this song right now."
+                        else -> "Couldn't play this song right now."
+                    }
+                )
+            } finally {
+                if (_preparing.value == track.id) _preparing.value = null
+            }
+        }
     }
 
     // album tracks from Deezer have no album object, so the cover comes from the album
     fun addAll(tracks: List<DzTrack>, cover: String?, skip: Set<Long>) = viewModelScope.launch {
         val missing = tracks.filter { it.id !in inLibrary.value && it.id !in skip }
-        missing.forEach { queue.enqueue(DownloadRequest.DeezerPick(it.id), it.title, it.artist.name, cover) }
+        missing.forEach { queue.enqueue(DownloadRequest.DeezerPick(it.id, Streams.videoFor(it.id)), it.title, it.artist.name, cover) }
         events.show(if (missing.isEmpty()) "You already have these songs" else "Added ${missing.size} songs to downloads")
     }
 

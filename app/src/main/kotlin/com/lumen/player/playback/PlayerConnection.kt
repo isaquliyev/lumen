@@ -65,13 +65,13 @@ class PlayerConnection @Inject constructor(
     val shuffle = queue.shuffle
 
     val nowPlaying: StateFlow<TrackRow?> = _mediaId
-        .flatMapLatest { id -> if (id == null) flowOf(null) else tracks.observe(trackIdOf(id)) }
+        .flatMapLatest { id -> if (id == null) flowOf(null) else if (isStream(id)) flowOf(Streams.row(id)) else tracks.observe(trackIdOf(id)) }
         .stateIn(scope, SharingStarted.Eagerly, null)
 
     val queueUi: StateFlow<QueueUi> = combine(_ids, _index) { ids, index -> ids to index }
         .mapLatest { (ids, index) ->
             val rows = tracks.rows(ids.map(::trackIdOf).distinct()).associateBy { it.id }
-            QueueUi(index, ids.mapIndexed { i, id -> QueueEntry(i, id, rows[trackIdOf(id)], isUserQueued(id)) })
+            QueueUi(index, ids.mapIndexed { i, id -> QueueEntry(i, id, rows[trackIdOf(id)] ?: Streams.row(id), isUserQueued(id)) })
         }
         .stateIn(scope, SharingStarted.Eagerly, QueueUi())
 
@@ -127,6 +127,7 @@ class PlayerConnection @Inject constructor(
         val c = _controller.value ?: return
         if (c.isPlaying) c.pause() else {
             if (c.playbackState == Player.STATE_ENDED) c.seekTo(c.currentMediaItemIndex, 0)
+            if (c.playbackState == Player.STATE_IDLE) c.prepare()
             c.play()
         }
     }

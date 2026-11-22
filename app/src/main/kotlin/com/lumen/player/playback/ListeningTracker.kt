@@ -77,6 +77,10 @@ class ListeningTracker @Inject constructor(
     }
 
     private fun start(item: MediaItem) {
+        if (isStream(item.mediaId)) {
+            open = null
+            return
+        }
         val now = System.currentTimeMillis()
         if (now - lastEndedAt > 15 * 60_000) sessionId = UUID.randomUUID().toString()
         open = Open(UUID.randomUUID().toString(), trackIdOf(item.mediaId), item.mediaMetadata.durationMs ?: 0, now)

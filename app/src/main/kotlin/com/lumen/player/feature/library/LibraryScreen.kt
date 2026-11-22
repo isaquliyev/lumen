@@ -1,10 +1,8 @@
 package com.lumen.player.feature.library
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,8 +36,6 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -60,7 +56,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lumen.player.core.db.AlbumRow
-import com.lumen.player.core.db.ArtistRow
 import com.lumen.player.core.db.PlayContext
 import com.lumen.player.core.db.TrackRow
 import com.lumen.player.core.design.ArtistAvatar
@@ -82,7 +77,6 @@ import com.lumen.player.core.design.trackThumb
 import com.lumen.player.core.util.formatCount
 import com.lumen.player.core.util.formatLength
 import com.lumen.player.feature.focus.FocusPill
-import com.lumen.player.feature.focus.LocalFocusActions
 import com.lumen.player.feature.player.PlayModeButton
 import com.lumen.player.feature.playlist.PlaylistsTab
 import com.lumen.player.feature.shell.AddRoute
@@ -265,15 +259,12 @@ private fun SelectionBar(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ArtistsTab(viewModel: LibraryViewModel) {
     val artists by viewModel.artists.collectAsStateWithLifecycle()
     val sort by viewModel.artistSort.collectAsStateWithLifecycle()
     val focus by viewModel.focus.collectAsStateWithLifecycle()
     val nav = LocalNav.current
-    val focusActions = LocalFocusActions.current
-    var menuFor by remember { mutableStateOf<ArtistRow?>(null) }
     val accent = LocalAccent.current.accent
 
     LazyVerticalGrid(
@@ -291,41 +282,27 @@ private fun ArtistsTab(viewModel: LibraryViewModel) {
         }
         items(artists, key = { it.id }) { artist ->
             val focused = artist.id in focus.ids
-            Box {
-                Column(
-                    Modifier
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                        .combinedClickable(onClick = { nav.open(ArtistRoute(artist.id)) }, onLongClick = { menuFor = artist })
-                        .testTag("artist_${artist.id}")
-                        .padding(4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box {
-                        ArtistAvatar(artistThumb(artist.id, artist.hasImage), artist.name, Modifier.fillMaxWidth().aspectRatio(1f))
-                        if (focused) Box(Modifier.align(Alignment.BottomEnd).size(14.dp).clip(CircleShape).background(accent))
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        artist.name,
-                        style = LumenType.label,
-                        color = if (focused) accent else LumenColors.paper,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                    )
+            Column(
+                Modifier
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .clickable { nav.open(ArtistRoute(artist.id)) }
+                    .testTag("artist_${artist.id}")
+                    .padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box {
+                    ArtistAvatar(artistThumb(artist.id, artist.hasImage), artist.name, Modifier.fillMaxWidth().aspectRatio(1f))
+                    if (focused) Box(Modifier.align(Alignment.BottomEnd).size(14.dp).clip(CircleShape).background(accent))
                 }
-                DropdownMenu(expanded = menuFor?.id == artist.id, onDismissRequest = { menuFor = null }, containerColor = LumenColors.ink2) {
-                    DropdownMenuItem(
-                        text = { Text("Focus on this artist", color = LumenColors.paper) },
-                        onClick = { focusActions.only(artist.id); menuFor = null },
-                        modifier = Modifier.testTag("artist_focus_only"),
-                    )
-                    DropdownMenuItem(
-                        text = { Text(if (focused) "Remove from focus" else "Add to focus", color = LumenColors.paper) },
-                        onClick = { focusActions.toggle(artist.id); menuFor = null },
-                        modifier = Modifier.testTag("artist_focus_toggle"),
-                    )
-                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    artist.name,
+                    style = LumenType.label,
+                    color = if (focused) accent else LumenColors.paper,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
     }

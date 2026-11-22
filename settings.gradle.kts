@@ -17,6 +17,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // NewPipe Extractor (streaming) is published only on JitPack
+        maven("https://jitpack.io") {
+            content { includeGroupByRegex("com\\.github\\.TeamNewPipe.*") }
+        }
     }
 }
 

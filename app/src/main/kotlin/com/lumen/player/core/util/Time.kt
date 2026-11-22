@@ -1,5 +1,8 @@
 package com.lumen.player.core.util
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 fun formatClock(ms: Long): String {
@@ -19,6 +22,18 @@ fun formatLength(ms: Long): String {
         hours > 0 && minutes % 60 > 0 -> "$hours h ${minutes % 60} min"
         hours > 0 -> "$hours h"
         else -> "$minutes min"
+    }
+}
+
+// "Today", "Yesterday", "12 days ago", "3 months ago", "2 years ago", counted in calendar days
+fun formatAgo(then: Long, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String {
+    val days = ChronoUnit.DAYS.between(Instant.ofEpochMilli(then).atZone(zone).toLocalDate(), Instant.ofEpochMilli(now).atZone(zone).toLocalDate())
+    return when {
+        days <= 0 -> "Today"
+        days == 1L -> "Yesterday"
+        days < 30 -> "$days days ago"
+        days < 365 -> (days / 30).let { if (it == 1L) "1 month ago" else "$it months ago" }
+        else -> (days / 365).let { if (it == 1L) "1 year ago" else "$it years ago" }
     }
 }
 

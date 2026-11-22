@@ -64,6 +64,15 @@ class QueueManager @Inject constructor(
         player.play()
     }
 
+    suspend fun playStream(item: MediaItem) {
+        val player = player()
+        originalOrder = emptyList()
+        contextHolder.set(PlayContext.QUEUE, null, "Streaming")
+        player.setMediaItems(listOf(item))
+        player.prepare()
+        player.play()
+    }
+
     fun userQueuedCount(player: Player): Int {
         var count = 0
         var i = player.currentMediaItemIndex + 1
@@ -166,6 +175,7 @@ class QueueManager @Inject constructor(
 
     suspend fun save(player: Player) {
         if (player.mediaItemCount == 0) return
+        if ((0 until player.mediaItemCount).all { isStream(player.getMediaItemAt(it).mediaId) }) return
         val saved = SavedQueue(
             mediaIds = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId },
             originalOrder = originalOrder,

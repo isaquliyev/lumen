@@ -1,5 +1,6 @@
 package com.lumen.player.core.design
 
+import com.lumen.player.playback.Streams
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,12 +75,14 @@ fun ArtistAvatar(model: Any?, name: String, modifier: Modifier = Modifier, lette
 
 @Composable
 fun trackThumb(trackId: String, hasCover: Boolean): Any? {
+    Streams.cover(trackId)?.let { return it }
     val paths = LocalPaths.current
     return if (hasCover) paths.coverThumb(trackId) else null
 }
 
 @Composable
 fun trackCover(trackId: String, hasCover: Boolean): Any? {
+    Streams.cover(trackId)?.let { return it }
     val paths = LocalPaths.current
     return if (hasCover) paths.cover(trackId) else null
 }

@@ -1,5 +1,6 @@
 package com.lumen.player.feature.pulse
 
+import com.lumen.player.core.util.formatAgo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -90,6 +91,7 @@ fun PulseScreen(viewModel: PulseViewModel = hiltViewModel()) {
     val scoped by viewModel.scoped.collectAsStateWithLifecycle()
     val focus by viewModel.focus.collectAsStateWithLifecycle()
     var allSongs by remember { mutableStateOf(false) }
+    var allIdle by remember { mutableStateOf(false) }
     val nav = LocalNav.current
     val player = LocalPlayer.current
 
@@ -132,6 +134,18 @@ fun PulseScreen(viewModel: PulseViewModel = hiltViewModel()) {
                     onClick = { player.play(songs.map { it.row }, index, PlayContext.QUEUE, null, "Pulse · top songs") },
                     leading = { Text("${index + 1}", style = LumenType.numeric, color = LumenColors.paper3, modifier = Modifier.width(26.dp)) },
                     trailing = { Text(formatLength(ranked.listenedMs), style = LumenType.numeric, color = LumenColors.paper2) },
+                )
+            }
+        }
+        if (d.idleSongs.isNotEmpty()) {
+            item { Section("Not played lately", if (d.idleSongs.size > 5) (if (allIdle) "Show less" else "See all") else null) { allIdle = !allIdle } }
+            val idle = if (allIdle) d.idleSongs else d.idleSongs.take(5)
+            itemsIndexed(idle, key = { _, it -> "idle_${it.row.id}" }) { index, item ->
+                TrackRowItem(
+                    item.row,
+                    onClick = { player.play(idle.map { it.row }, index, PlayContext.QUEUE, null, "Pulse · not played lately") },
+                    leading = { Text("${index + 1}", style = LumenType.numeric, color = LumenColors.paper3, modifier = Modifier.width(26.dp)) },
+                    trailing = { Text(item.lastPlayed?.let { formatAgo(it) } ?: "Never played", style = LumenType.numeric, color = LumenColors.paper2) },
                 )
             }
         }

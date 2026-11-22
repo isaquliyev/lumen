@@ -10,3 +10,14 @@
 -dontwarn org.apache.commons.compress.**
 -keep class org.apache.commons.io.** { *; }
 -dontwarn org.apache.commons.io.**
+
+# NewPipe Extractor (streaming): Rhino runs YouTube's player JavaScript, and the extractor loads
+# some classes by name
+-keep class org.schabi.newpipe.extractor.** { *; }
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.classfile.ClassFileWriter
+-dontwarn org.mozilla.javascript.**
+-dontwarn javax.script.**
+-dontwarn java.beans.**
+-dontwarn jdk.dynalink.**
+-dontwarn org.jsoup.**

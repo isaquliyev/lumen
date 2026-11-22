@@ -4,6 +4,7 @@ import com.lumen.player.core.util.AudioCandidate
 import com.lumen.player.core.util.activeLineIndex
 import com.lumen.player.core.util.bestCandidate
 import com.lumen.player.core.util.coreTitle
+import com.lumen.player.core.util.formatAgo
 import com.lumen.player.core.util.normalize
 import com.lumen.player.core.util.parseLyrics
 import com.lumen.player.core.util.scoreCandidate
@@ -70,6 +71,19 @@ class UtilTest {
         assertEquals(LinkKind.YOUTUBE, classifyLink("https://music.youtube.com/watch?v=dQw4w9WgXcQ"))
         assertNull(classifyLink("https://example.com/song"))
         assertEquals("https://youtu.be/x", firstUrl("listen to this https://youtu.be/x."))
+    }
+
+    @Test
+    fun agoText() {
+        val zone = java.time.ZoneId.of("UTC")
+        val now = java.time.LocalDate.of(2026, 11, 22).atTime(18, 0).atZone(zone).toInstant().toEpochMilli()
+        fun daysBack(d: Long) = now - d * 86_400_000L
+        assertEquals("Today", formatAgo(now - 3_600_000L, now, zone))
+        assertEquals("Yesterday", formatAgo(daysBack(1), now, zone))
+        assertEquals("12 days ago", formatAgo(daysBack(12), now, zone))
+        assertEquals("1 month ago", formatAgo(daysBack(45), now, zone))
+        assertEquals("5 months ago", formatAgo(daysBack(160), now, zone))
+        assertEquals("2 years ago", formatAgo(daysBack(800), now, zone))
     }
 
     @Test

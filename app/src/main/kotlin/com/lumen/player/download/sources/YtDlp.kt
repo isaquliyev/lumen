@@ -29,6 +29,8 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class StreamUrl(val url: String, val headers: Map<String, String>)
+
 data class VideoMeta(val id: String, val title: String, val uploader: String, val durationSec: Int?, val thumbnail: String?)
 
 object YtDlpParse {
@@ -47,6 +49,14 @@ object YtDlpParse {
                 durationSec = entry["duration"]?.jsonPrimitive?.doubleOrNull?.toInt(),
             )
         }
+    }
+
+    fun stream(json: String): StreamUrl {
+        val root = Json.parseToJsonElement(json).jsonObject
+        val url = root.str("url") ?: root["requested_formats"]?.jsonArray?.firstOrNull()?.jsonObject?.str("url")
+            ?: throw JobFailure("Couldn't get the audio for this song.")
+        val headers = root["http_headers"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content }.orEmpty()
+        return StreamUrl(url, headers)
     }
 
     fun video(json: String): VideoMeta {
@@ -87,6 +97,9 @@ class YtDlpManager @Inject constructor(
 
     suspend fun awaitReady() = ready.first { it }
 
+    // yt-dlp keeps YouTube's player code here between runs, so each call does not fetch it again
+    val cacheDir: File get() = File(context.cacheDir, "yt-dlp").apply { mkdirs() }
+
     suspend fun update(): String = updateMutex.withLock {
         withContext(Dispatchers.IO) {
             awaitReady()
@@ -123,6 +136,7 @@ class YtDlpAudio @Inject constructor(private val manager: YtDlpManager) {
             addOption("--flat-playlist")
             addOption("--dump-single-json")
             addOption("--no-warnings")
+            addOption("--cache-dir", manager.cacheDir.absolutePath)
         }
         val response = YoutubeDL.getInstance().execute(request)
         if (response.err.isNotBlank()) Log.d("Lumen", "yt-dlp stderr: ${response.err.take(500)}")
@@ -134,8 +148,21 @@ class YtDlpAudio @Inject constructor(private val manager: YtDlpManager) {
             addOption("--dump-single-json")
             addOption("--no-playlist")
             addOption("--no-warnings")
+            addOption("--cache-dir", manager.cacheDir.absolutePath)
         }
         YtDlpParse.video(YoutubeDL.getInstance().execute(request).out)
+    }
+
+    // the direct audio link, the same format a download saves; it works for a few hours
+    suspend fun streamUrl(videoId: String): StreamUrl = run {
+        val request = YoutubeDLRequest("https://www.youtube.com/watch?v=$videoId").apply {
+            addOption("-f", "bestaudio[ext=m4a]/bestaudio")
+            addOption("--dump-single-json")
+            addOption("--no-playlist")
+            addOption("--no-warnings")
+            addOption("--cache-dir", manager.cacheDir.absolutePath)
+        }
+        YtDlpParse.stream(YoutubeDL.getInstance().execute(request).out)
     }
 
     suspend fun download(videoId: String, workDir: File, trackId: String, jobId: String, onProgress: (Int) -> Unit): File = run {
@@ -145,6 +172,7 @@ class YtDlpAudio @Inject constructor(private val manager: YtDlpManager) {
             addOption("--no-playlist")
             addOption("--no-mtime")
             addOption("--no-part")
+            addOption("--cache-dir", manager.cacheDir.absolutePath)
             addOption("-o", File(workDir, "$trackId.%(ext)s").absolutePath)
         }
         val response = YoutubeDL.getInstance().execute(request, jobId) { progress, _, _ ->

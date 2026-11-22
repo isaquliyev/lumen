@@ -1,5 +1,8 @@
 package com.lumen.player.feature.playlist
 
+import com.lumen.player.download.StreamSaver
+import com.lumen.player.playback.Streams
+import com.lumen.player.playback.isStream
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -63,6 +66,7 @@ import javax.inject.Inject
 class AddToPlaylistViewModel @Inject constructor(
     private val repository: PlaylistRepository,
     private val events: AppEvents,
+    private val saver: StreamSaver,
 ) : ViewModel() {
     val trackIds = MutableStateFlow<List<String>?>(null)
     val playlists: StateFlow<List<PlaylistRow>> = repository.all.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -75,9 +79,20 @@ class AddToPlaylistViewModel @Inject constructor(
         if (ids?.size == 1) repository.observeContaining(ids.first()).map { it.toSet() } else flowOf(emptySet())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+    // streamed songs are downloaded first and added once they are in the library
+    private suspend fun addStreams(ids: List<String>, playlistId: String) {
+        ids.mapNotNull(Streams::get).forEach { info -> saver.whenSaved(info) { repository.add(playlistId, listOf(it)) } }
+    }
+
     fun addTo(playlist: PlaylistRow) = viewModelScope.launch {
-        val ids = trackIds.value ?: return@launch
+        val all = trackIds.value ?: return@launch
         trackIds.value = null
+        addStreams(all.filter(::isStream), playlist.id)
+        val ids = all.filterNot(::isStream)
+        if (ids.isEmpty()) {
+            events.show("Downloading. It will be added to ${playlist.name}")
+            return@launch
+        }
         val added = repository.add(playlist.id, ids)
         events.show(
             when {
@@ -89,12 +104,13 @@ class AddToPlaylistViewModel @Inject constructor(
     }
 
     fun createWith(onDone: () -> Unit) = viewModelScope.launch {
-        val ids = trackIds.value ?: return@launch
+        val all = trackIds.value ?: return@launch
         trackIds.value = null
         val name = repository.nextDefaultName()
         val id = repository.create(name)
-        repository.add(id, ids)
-        events.show("Added to $name")
+        addStreams(all.filter(::isStream), id)
+        repository.add(id, all.filterNot(::isStream))
+        events.show(if (all.all(::isStream)) "Downloading. It will be added to $name" else "Added to $name")
         onDone()
     }
 }

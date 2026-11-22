@@ -1,5 +1,14 @@
 package com.lumen.player.feature.player
 
+import com.lumen.player.core.AppEvents
+import com.lumen.player.core.db.DownloadJobDao
+import com.lumen.player.core.db.JobStatus
+import com.lumen.player.download.DownloadQueue
+import com.lumen.player.download.DownloadRequest
+import com.lumen.player.download.StreamSaver
+import com.lumen.player.download.decodeRequest
+import com.lumen.player.playback.Streams
+import kotlinx.coroutines.flow.combine
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lumen.player.core.db.PlayContext
@@ -40,6 +49,10 @@ class PlayerViewModel @Inject constructor(
     lyricsRepository: LyricsRepository,
     contextHolder: PlaybackContextHolder,
     private val settings: SettingsRepository,
+    private val saver: StreamSaver,
+    private val events: AppEvents,
+    downloads: DownloadQueue,
+    jobDao: DownloadJobDao,
 ) : ViewModel() {
     val nowPlaying = connection.nowPlaying
     val isPlaying = connection.isPlaying
@@ -50,6 +63,25 @@ class PlayerViewModel @Inject constructor(
     val context = contextHolder.flow
     val sleep = extras.sleep
     val shuffleMode: StateFlow<Boolean> = settings.settings.map { it.songsShuffle }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    // null unless the playing song is streamed
+    val streamSave: StateFlow<StreamSave?> = combine(nowPlaying, jobDao.observeLibraryDeezerLinks(), downloads.jobs) { row, links, jobs ->
+        val info = row?.id?.let(Streams::get) ?: return@combine null
+        when {
+            links.any { it.deezerId == info.deezerId } -> StreamSave.SAVED
+            jobs.any { job ->
+                (job.status == JobStatus.QUEUED || job.status == JobStatus.RUNNING) &&
+                    (runCatching { decodeRequest(job.request) }.getOrNull() as? DownloadRequest.DeezerPick)?.deezerId == info.deezerId
+            } -> StreamSave.SAVING
+            else -> StreamSave.NONE
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun saveStream() = viewModelScope.launch {
+        val info = nowPlaying.value?.id?.let(Streams::get) ?: return@launch
+        saver.save(info)
+        events.show("Downloading “${info.title}”")
+    }
 
     private val currentId = nowPlaying.map { it?.id }.distinctUntilChanged()
 

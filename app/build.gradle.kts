@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.okhttp)
     implementation(libs.youtubedl.android)
+    implementation(libs.newpipe.extractor)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.compiler)

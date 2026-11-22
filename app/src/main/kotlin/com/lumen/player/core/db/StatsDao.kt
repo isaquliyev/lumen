@@ -105,6 +105,14 @@ interface StatsDao {
     )
     fun forgotten(minPlays: Int, cutoff: Long): Flow<List<TrackPlays>>
 
+    // library songs by how long they have gone unplayed; a song never played counts from the day it was
+    // added, so a new song does not come first. Songs kept out of the Library are left out
+    @Query(
+        "SELECT $TRACK_ROW, (SELECT MAX(pe.started_at) FROM play_events pe WHERE pe.track_id = t.id AND pe.listened_ms >= 30000) AS lastPlayed " +
+            "$TRACK_FROM WHERE t.deleted_at IS NULL AND $NOT_HIDDEN AND $FOCUS_FILTER ORDER BY COALESCE(lastPlayed, t.added_at) LIMIT :limit"
+    )
+    fun leastRecent(limit: Int, focusOff: Boolean, focusIds: List<String>): Flow<List<IdleTrack>>
+
     @Query("SELECT MIN(started_at) FROM play_events")
     fun firstEventTime(): Flow<Long?>
 }

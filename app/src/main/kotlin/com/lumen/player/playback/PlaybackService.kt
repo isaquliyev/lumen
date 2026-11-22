@@ -9,17 +9,21 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.ListenableFuture
 import com.lumen.player.MainActivity
 import com.lumen.player.data.SettingsRepository
+import com.lumen.player.download.StreamResolver
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +50,7 @@ class PlaybackService : MediaSessionService() {
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var extras: PlaybackExtras
     @Inject lateinit var tracker: ListeningTracker
+    @Inject lateinit var resolver: StreamResolver
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaSession? = null
@@ -53,6 +58,7 @@ class PlaybackService : MediaSessionService() {
     @Volatile private var normalize = true
     @Volatile private var mono = false
     private var enhancer: LoudnessEnhancer? = null
+    private var lastStreamRetry = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -70,6 +76,7 @@ class PlaybackService : MediaSessionService() {
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 true,
             )
+            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(this, StreamHttp.factory)))
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
@@ -100,6 +107,25 @@ class PlaybackService : MediaSessionService() {
                 if (!p.isPlaying && holder.player.value != null &&
                     events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_TIMELINE_CHANGED, Player.EVENT_POSITION_DISCONTINUITY)
                 ) scope.launch { queue.save(player) }
+            }
+
+            // a streamed song whose link stopped working (links expire after a few hours) gets a fresh one
+            override fun onPlayerError(error: PlaybackException) {
+                val item = player.currentMediaItem ?: return
+                val info = Streams.get(item.mediaId) ?: return
+                val now = System.currentTimeMillis()
+                if (now - lastStreamRetry < 30_000) return
+                lastStreamRetry = now
+                val index = player.currentMediaItemIndex
+                val position = player.currentPosition
+                scope.launch {
+                    runCatching { resolver.mediaItem(info, ytDlpOnly = true) }.onSuccess { fresh ->
+                        player.replaceMediaItem(index, fresh)
+                        player.seekTo(index, position)
+                        player.prepare()
+                        player.play()
+                    }.onFailure { Log.w("Lumen", "stream refresh failed", it) }
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {

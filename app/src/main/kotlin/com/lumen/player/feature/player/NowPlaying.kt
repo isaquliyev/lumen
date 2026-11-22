@@ -1,5 +1,7 @@
 package com.lumen.player.feature.player
 
+import com.lumen.player.core.design.trackCover
+import com.lumen.player.playback.isStream
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -176,8 +178,10 @@ fun NowPlaying(track: TrackRow, viewModel: PlayerViewModel, onCollapse: () -> Un
                         Text("PLAYING FROM", style = LumenType.overline, color = LumenColors.paper3)
                         Text(context.name, style = LumenType.label, color = LumenColors.paper, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    IconButton(onClick = { shareOpen = true }, modifier = Modifier.testTag("player_share")) {
-                        Icon(Icons.Rounded.Share, "Share to Instagram Story", tint = LumenColors.paper)
+                    if (!isStream(track.id)) {
+                        IconButton(onClick = { shareOpen = true }, modifier = Modifier.testTag("player_share")) {
+                            Icon(Icons.Rounded.Share, "Share to Instagram Story", tint = LumenColors.paper)
+                        }
                     }
                     IconButton(onClick = { menu.open(track) }, modifier = Modifier.testTag("player_menu")) {
                         Icon(Icons.Rounded.MoreHoriz, "More", tint = LumenColors.paper)
@@ -203,7 +207,12 @@ fun NowPlaying(track: TrackRow, viewModel: PlayerViewModel, onCollapse: () -> Un
                             if (artists.isEmpty()) Text(track.artistLine.orEmpty(), style = LumenType.label, color = LumenColors.paper2)
                         }
                     }
-                    LikeButton(track.likedAt != null) { viewModel.setLiked(track.id, track.likedAt == null) }
+                    if (isStream(track.id)) {
+                        val save by viewModel.streamSave.collectAsStateWithLifecycle()
+                        save?.let { StreamSaveButton(it, viewModel::saveStream) }
+                    } else {
+                        LikeButton(track.likedAt != null) { viewModel.setLiked(track.id, track.likedAt == null) }
+                    }
                 }
                 Spacer(Modifier.height(18.dp))
                 val progress = if (duration > 0) position.toFloat() / duration else 0f
@@ -285,7 +294,7 @@ private fun CoverPager(viewModel: PlayerViewModel) {
     HorizontalPager(pager, modifier = Modifier.fillMaxWidth().aspectRatio(1f).testTag("cover_pager"), pageSpacing = 16.dp, beyondViewportPageCount = 1) { page ->
         val row = entries[page].row
         CoverImage(
-            if (row?.hasCover == true) paths.cover(row.id) else null,
+            row?.let { trackCover(it.id, it.hasCover) },
             row?.title ?: "",
             Modifier.fillMaxSize(),
             radius = Radii.card,

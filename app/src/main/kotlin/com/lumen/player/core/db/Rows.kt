@@ -1,5 +1,6 @@
 package com.lumen.player.core.db
 
+import androidx.room.Embedded
 import androidx.compose.runtime.Immutable
 
 // columns shared by every track list query (no waveform, so list models stay light)
@@ -40,6 +41,9 @@ const val NOT_HIDDEN = """
 """
 
 data class DeezerLink(val deezerId: Long, val trackId: String)
+
+// a library song and its last real play (30 s or more); null when it was never played
+data class IdleTrack(@Embedded val row: TrackRow, val lastPlayed: Long?)
 
 @Immutable
 data class TrackRow(
